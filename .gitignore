@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+*.log
+.DS_Store
+
+# gpt-image skill default output folder (we write to art/source instead)
+generated-images/
+
+# local game.mjs session state
+.codegpt-game/

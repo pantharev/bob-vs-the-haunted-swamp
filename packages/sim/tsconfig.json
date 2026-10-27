@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No DOM: the sim has to run headless on a Node/Deno server.
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src", "test"]
+}
