@@ -1,7 +1,11 @@
 import type { Game } from '../game';
+import { InfoButtons, InfoScreen, useInfoPage } from './info';
 import { SoundToggles } from './sound-toggles';
 
 export function PauseScreen({ game }: { game: Game }) {
+  const [page, open] = useInfoPage(game);
+  if (page) return <InfoScreen page={page} onBack={() => open(null)} />;
+
   return (
     <div class="screen">
       <div class="panel narrow">
@@ -13,7 +17,12 @@ export function PauseScreen({ game }: { game: Game }) {
           <button class="primary big" onClick={() => game.setPaused(false)}>
             Resume
           </button>
-          <SoundToggles game={game} />
+          <div class="row">
+            <SoundToggles game={game} />
+          </div>
+          <div class="row">
+            <InfoButtons onOpen={open} />
+          </div>
           <button onClick={() => game.quitToTitle()}>Quit run</button>
         </div>
       </div>

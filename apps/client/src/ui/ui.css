@@ -189,6 +189,16 @@ button.small {
   flex-direction: column;
 }
 
+/* A pair of buttons side by side inside a column of actions. */
+.actions .row {
+  display: flex;
+  gap: 10px;
+}
+
+.actions .row > * {
+  flex: 1;
+}
+
 /* ---------------------------------------------------------------- cards */
 
 .cards {

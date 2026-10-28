@@ -54,7 +54,10 @@ function App({ game }: { game: Game }) {
   }
 }
 
-/** Runs `handler` for key presses that aren't aimed at a focused control. */
+/**
+ * Runs `handler` for key presses that aren't aimed at a focused control. Menus hear keys before
+ * the game does, so a key a menu handles (Esc on a help page) doesn't also pause or resume.
+ */
 export function useHotkeys(handler: (code: string) => boolean | void, deps: unknown[]): void {
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
@@ -63,7 +66,7 @@ export function useHotkeys(handler: (code: string) => boolean | void, deps: unkn
       if ((e.code === 'Enter' || e.code === 'Space') && focused && focused !== document.body) return;
       if (handler(e.code)) e.preventDefault();
     };
-    window.addEventListener('keydown', listener);
-    return () => window.removeEventListener('keydown', listener);
+    window.addEventListener('keydown', listener, { capture: true });
+    return () => window.removeEventListener('keydown', listener, { capture: true });
   }, deps);
 }

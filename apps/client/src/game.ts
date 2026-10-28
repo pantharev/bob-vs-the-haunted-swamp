@@ -221,7 +221,8 @@ export class Game {
   }
 
   private onKey(e: KeyboardEvent): void {
-    if (e.repeat) return;
+    // A menu already handled it (see useHotkeys).
+    if (e.repeat || e.defaultPrevented) return;
     if (e.code === 'Escape' || e.code === 'KeyP') {
       if (this.inWave) this.setPaused(!this.paused);
     } else if (e.code === 'KeyM') {

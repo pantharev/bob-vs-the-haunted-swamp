@@ -1,11 +1,48 @@
 import { MAX_WEAPONS, ZONES } from '@game/content';
 import type { ComponentChildren } from 'preact';
+import { useState } from 'preact/hooks';
+import type { Game } from '../game';
 import { CHANGELOG, CREATOR } from './about';
 import { useHotkeys } from './app';
 
 const touch = window.matchMedia('(pointer: coarse)').matches;
 
-/** A title-screen page with a Back button; Escape goes back too. */
+export type InfoPageId = 'help' | 'changelog';
+
+/** Which info page is open over the title or pause screen, if any. */
+export function useInfoPage(game: Game) {
+  const [page, setPage] = useState<InfoPageId | null>(null);
+  const open = (next: InfoPageId | null) => {
+    game.audio.ui('click');
+    setPage(next);
+  };
+  return [page, open] as const;
+}
+
+export function InfoButtons({
+  onOpen,
+  small,
+}: {
+  onOpen: (page: InfoPageId) => void;
+  small?: boolean;
+}) {
+  return (
+    <>
+      <button class={small ? 'small' : ''} onClick={() => onOpen('help')}>
+        How to play
+      </button>
+      <button class={small ? 'small' : ''} onClick={() => onOpen('changelog')}>
+        Changelog
+      </button>
+    </>
+  );
+}
+
+export function InfoScreen({ page, onBack }: { page: InfoPageId; onBack: () => void }) {
+  return page === 'help' ? <HelpScreen onBack={onBack} /> : <ChangelogScreen onBack={onBack} />;
+}
+
+/** A page over the title or pause screen with a Back button; Escape goes back too. */
 function InfoPage({
   title,
   onBack,

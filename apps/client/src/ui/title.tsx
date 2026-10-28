@@ -4,22 +4,18 @@ import type { Game } from '../game';
 import { CREATOR, VERSION } from './about';
 import { useHotkeys } from './app';
 import { WEAPON_ICONS, weaponStats } from './format';
-import { ChangelogScreen, HelpScreen } from './info';
+import { InfoButtons, InfoScreen, useInfoPage } from './info';
 import { SoundToggles } from './sound-toggles';
 
 const touch = window.matchMedia('(pointer: coarse)').matches;
 
 export function TitleScreen({ game }: { game: Game }) {
   const [weapon, setWeapon] = useState<WeaponId>(game.lastWeapon);
-  const [page, setPage] = useState<'main' | 'help' | 'changelog'>('main');
+  const [page, open] = useInfoPage(game);
   const start = () => game.startRun({ weapon });
-  const open = (next: typeof page) => {
-    game.audio.ui('click');
-    setPage(next);
-  };
   useHotkeys(
     (code) => {
-      if (page === 'main' && (code === 'Enter' || code === 'Space')) {
+      if (!page && (code === 'Enter' || code === 'Space')) {
         start();
         return true;
       }
@@ -27,8 +23,7 @@ export function TitleScreen({ game }: { game: Game }) {
     [weapon, page],
   );
 
-  if (page === 'help') return <HelpScreen onBack={() => open('main')} />;
-  if (page === 'changelog') return <ChangelogScreen onBack={() => open('main')} />;
+  if (page) return <InfoScreen page={page} onBack={() => open(null)} />;
 
   return (
     <div class="screen">
@@ -70,12 +65,7 @@ export function TitleScreen({ game }: { game: Game }) {
           </button>
         </div>
         <div class="actions">
-          <button class="small" onClick={() => open('help')}>
-            How to play
-          </button>
-          <button class="small" onClick={() => open('changelog')}>
-            Changelog
-          </button>
+          <InfoButtons onOpen={open} small />
           <SoundToggles game={game} small />
         </div>
         <p class="hint">
