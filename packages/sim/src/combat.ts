@@ -1,8 +1,14 @@
-import { ELITE, ENEMIES, type EnemyId, type WeaponDef } from '@game/content';
+import { ELITE, ENEMIES, type EnemyId, type WeaponDef, type WeaponId } from '@game/content';
 import { MAX_ENEMY_RADIUS, MAX_GOO, MAX_PICKUPS, seconds } from './constants';
 import type { PickupKind } from './events';
 import { randomUnit, type Vec } from './math';
-import { armourFactor, classDamageMultiplier, dodgeChance, recomputeStats, xpToNext } from './stats';
+import {
+  armourFactor,
+  classDamageMultiplier,
+  dodgeChance,
+  recomputeStats,
+  xpToNext,
+} from './stats';
 import type { Enemy, Pickup, Player, World } from './world';
 
 /** Invulnerability after taking a hit, and after a dodge. */
@@ -59,11 +65,12 @@ export function damageEnemy(
   pushX: number,
   pushY: number,
   killer: Player,
+  weapon: WeaponId | null = null,
 ): void {
   if (!e.alive) return;
   world.stats.damageDealt += Math.min(amount, e.hp);
   e.hp -= amount;
-  world.events.push({ type: 'enemyHit', id: e.id, x: e.x, y: e.y, amount, crit });
+  world.events.push({ type: 'enemyHit', id: e.id, x: e.x, y: e.y, amount, crit, weapon });
   if (e.action !== 'lunge') {
     e.kx += pushX / e.mass;
     e.ky += pushY / e.mass;
@@ -107,7 +114,8 @@ function killEnemy(world: World, e: Enemy, killer: Player): void {
       child.ky = unit.y * SPLIT_POP;
     }
   }
-  if (def.goo) addGoo(world, e.x, e.y, def.goo.radius * (e.elite ? ELITE.radius : 1), def.goo.duration);
+  if (def.goo)
+    addGoo(world, e.x, e.y, def.goo.radius * (e.elite ? ELITE.radius : 1), def.goo.duration);
 }
 
 /** One weapon hit on one enemy: class, tag and crit bonuses, knockback, life steal. */
@@ -127,7 +135,8 @@ export function weaponHit(
   const crit = world.rng.chance(def.critChance + p.character.critChance + p.stats.critChance / 100);
   if (crit) amount *= def.critMultiplier;
 
-  damageEnemy(world, e, Math.max(1, Math.round(amount)), crit, dirX * def.knockback, dirY * def.knockback, p);
+  const push = def.knockback;
+  damageEnemy(world, e, Math.max(1, Math.round(amount)), crit, dirX * push, dirY * push, p, def.id);
   if (p.stats.lifesteal > 0 && world.rng.chance(p.stats.lifesteal / 100)) healPlayer(world, p, 1);
 }
 
@@ -202,7 +211,13 @@ export function dropCoins(world: World, x: number, y: number, value: number): vo
   for (let i = 0; i < pieces; i++) spawnPickup(world, 'coin', base + (i < extra ? 1 : 0), x, y);
 }
 
-export function spawnPickup(world: World, kind: PickupKind, value: number, x: number, y: number): void {
+export function spawnPickup(
+  world: World,
+  kind: PickupKind,
+  value: number,
+  x: number,
+  y: number,
+): void {
   if (world.pickups.length >= MAX_PICKUPS) {
     if (kind !== 'coin') return;
     // At the cap, fold the value into a coin that is still lying around.

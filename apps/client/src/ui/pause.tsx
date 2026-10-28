@@ -1,4 +1,5 @@
 import type { Game } from '../game';
+import { SoundToggles } from './sound-toggles';
 
 export function PauseScreen({ game }: { game: Game }) {
   return (
@@ -12,7 +13,7 @@ export function PauseScreen({ game }: { game: Game }) {
           <button class="primary big" onClick={() => game.setPaused(false)}>
             Resume
           </button>
-          <button onClick={() => game.toggleMute()}>{game.audio.muted ? 'Sound: off' : 'Sound: on'}</button>
+          <SoundToggles game={game} />
           <button onClick={() => game.quitToTitle()}>Quit run</button>
         </div>
       </div>

@@ -1,7 +1,9 @@
 import { ZONES, type WeaponId, type ZoneDef } from '@game/content';
 import { applyAction, createWorld, DT, step, type RunAction, type World } from '@game/sim';
 import type { Application } from 'pixi.js';
-import type { Blips } from './audio/blips';
+import type { GameAudio } from './audio/audio';
+import type { MusicScene } from './audio/music';
+import type { UiSound } from './audio/sfx-bank';
 import type { DebugOverlay } from './debug/overlay';
 import type { Input } from './input/input';
 import type { GameView } from './render/game-view';
@@ -42,7 +44,7 @@ export class Game {
     private readonly app: Application,
     private readonly view: GameView,
     private readonly input: Input,
-    readonly audio: Blips,
+    readonly audio: GameAudio,
     private readonly debug: DebugOverlay,
   ) {
     this.world = this.backdrop();
@@ -79,11 +81,13 @@ export class Game {
     this.paused = false;
     this.accumulator = 0;
     this.input.reset();
+    this.audio.ui('start');
     this.consume();
     this.notify();
   }
 
   quitToTitle(): void {
+    this.audio.ui('click');
     this.world = this.backdrop();
     this.screen = 'title';
     this.paused = false;
@@ -94,6 +98,7 @@ export class Game {
     const next = paused && this.inWave;
     if (next === this.paused) return;
     this.paused = next;
+    this.audio.ui(next ? 'pause' : 'resume');
     this.input.reset();
     this.notify();
   }
@@ -103,10 +108,17 @@ export class Game {
     this.notify();
   }
 
+  toggleMusic(): void {
+    this.audio.toggleMusic();
+    this.audio.ui('click');
+    this.notify();
+  }
+
   /** A between-wave choice from the UI. Returns false if the sim refused it. */
   act(action: RunAction): boolean {
+    const sound = this.actionSound(action);
     const ok = applyAction(this.world, 0, action);
-    this.audio.ui(ok ? (action.type === 'buy' ? 'buy' : 'click') : 'error');
+    this.audio.ui(ok ? sound : 'error');
     this.consume();
     if (ok && this.world.phase === 'wave') {
       this.accumulator = 0;
@@ -143,6 +155,7 @@ export class Game {
     }
 
     this.view.render(running ? this.accumulator / DT : 1, frameSeconds, this.input);
+    this.audio.update(this.musicScene(), this.musicIntensity(), this.paused);
 
     this.debug.update(performance.now(), () => {
       const p = world.players[0];
@@ -156,9 +169,55 @@ export class Game {
     });
   }
 
+  private musicScene(): MusicScene {
+    if (this.screen === 'title') return 'title';
+    switch (this.world.phase) {
+      case 'wave':
+        return 'wave';
+      case 'intermission':
+        return 'shop';
+      case 'over':
+        return this.world.outcome === 'victory' ? 'victory' : 'defeat';
+    }
+  }
+
+  /** 0..1 from how far into the run we are and how crowded it is; elites push it to the top. */
+  private musicIntensity(): number {
+    const world = this.world;
+    if (!this.inWave) return 0;
+    const progress = (world.wave - 1) / Math.max(1, world.waves.length - 1);
+    const crowd = Math.min(world.enemies.length / 120, 1);
+    let intensity = 0.1 + 0.45 * progress + 0.45 * crowd;
+    if (world.wave === world.waves.length) intensity = Math.max(intensity, 0.95);
+    for (const enemy of world.enemies) {
+      if (enemy.elite) return Math.max(intensity, 0.9);
+    }
+    return Math.min(intensity, 1);
+  }
+
+  /** Read before the action applies: the pick's rarity, the lock's state. */
+  private actionSound(action: RunAction): UiSound {
+    const p = this.world.players[0];
+    switch (action.type) {
+      case 'chooseUpgrade':
+        return `pick${p?.upgrades[action.index]?.rarity ?? 1}`;
+      case 'buy':
+        return 'buy';
+      case 'reroll':
+        return 'reroll';
+      case 'toggleLock':
+        return p?.shop[action.index]?.locked ? 'unlock' : 'lock';
+      case 'sellWeapon':
+        return 'sell';
+      case 'ready':
+        // The wave's own horn follows straight away.
+        return 'click';
+    }
+  }
+
   private consume(): void {
     this.view.handleEvents(this.world.events);
-    this.audio.handle(this.world.events);
+    this.audio.handle(this.world.events, this.world.players[0]?.x ?? 0);
   }
 
   private onKey(e: KeyboardEvent): void {

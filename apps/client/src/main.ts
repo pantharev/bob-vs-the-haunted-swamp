@@ -1,6 +1,6 @@
 import { WEAPON_IDS, type WeaponId } from '@game/content';
 import { Application } from 'pixi.js';
-import { Blips } from './audio/blips';
+import { GameAudio } from './audio/audio';
 import { DebugOverlay } from './debug/overlay';
 import { Game } from './game';
 import { Input } from './input/input';
@@ -30,7 +30,7 @@ async function boot(): Promise<void> {
 
   const art = await createArt(app.renderer, import.meta.env.BASE_URL);
   const view = new GameView(app, art);
-  const game = new Game(app, view, new Input(app.canvas), new Blips(), new DebugOverlay());
+  const game = new Game(app, view, new Input(app.canvas), new GameAudio(), new DebugOverlay());
   mountUi(game);
 
   // Dev/test shortcuts: ?weapon=staff&wave=5&seed=42 starts a run immediately.

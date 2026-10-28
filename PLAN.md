@@ -1,6 +1,6 @@
 # Survivors-like: Bob vs. the Haunted Swamp — Game Plan
 
-> **Status:** Phase 0 done (2026-10-27). Phase 1 built 2026-10-28 and waiting on the "is it fun?" play-test. Working title is TBD.
+> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Working title is TBD.
 > **Decided 2026-10-27:** inspired-by naming (no RuneScape names in the game) · PixiJS + own sim · art via GPT Image.
 > Library versions below were checked on npm today. Art is generated with GPT Image through the user's ChatGPT subscription (§6).
 
@@ -128,7 +128,7 @@ Run modifiers: **difficulty 0–5**, and **Ironman** (no shop, only drops), whic
 | Rendering | **PixiJS 8.22** (WebGL/WebGPU) | Batches hundreds of sprites in 1–2 draw calls (ParticleContainer) and is renderer-only, so our sim stays engine-free |
 | Simulation | Own pure-TS package `@game/sim` | Runs headless in Node for multiplayer, bot balancing and replay verification |
 | Menus/shop UI | **Preact 11** DOM overlay | Crisp text, accessible, easy responsive layout; the in-run HUD stays in Pixi for performance |
-| Audio | **Tone.js 15.1** | Synth SFX + adaptive music; Strudel later (§7) |
+| Audio | **Tone.js 15.1** + plain-TS synth | Adaptive music (Tone); SFX rendered offline in TS; Strudel later (§7) |
 | Backend | **Supabase** (supabase-js 2.118): Auth, Postgres, Edge Functions | Hiscores, skins, achievements, cloud save |
 | Multiplayer (later) | **socket.io 4.8** on Node, hosted on Fly.io/Railway | Needs a persistent server, not serverless |
 | Mobile | PWA (vite-plugin-pwa 2.0); Capacitor later if we go to app stores | Install to home screen, fullscreen, offline |
@@ -247,6 +247,45 @@ Two rules keep a horde from turning into noise:
 
 **Strudel later:** everything goes behind a `MusicEngine` interface (`setScene`, `setIntensity`), so the Tone engine and a future Strudel engine are swappable.
 
+**Built (2026-10-28): "Wolfmoor Waltz"**, an original spooky waltz in D minor (3/4, 32 bars, A A' B C, with the flat-two Eb chord for the haunted feel). Code lives in `apps/client/src/audio/`:
+- `score.ts` holds the tune as plain data (note:beats strings that fail the tests if a bar is the wrong length).
+- `music.ts` is the `MusicEngine` interface plus the scene and intensity → layer-mix rules.
+- `tone-music.ts` is the Tone engine. Ten layers each have their own gain, so scene changes are crossfades on one transport:
+  - instruments: pizzicato bass, church organ, harpsichord stabs and arpeggio, clarinet-ish lead, tubular bells, timpani, bone clacks, "ooh" choir and music box
+  - the wave scene adds arpeggio → timpani → clacks → choir as intensity rises (crowd size, wave number, elites, final wave) and leans the tempo from 86 to 96 BPM
+  - the shop is the music-box variant; victory and defeat have their own stings
+- `audio.ts` (`GameAudio`) owns the single AudioContext shared by music and SFX. It:
+  - unlocks on any gesture
+  - suspends when muted or hidden, so both cost no CPU
+  - lazy-loads Tone (a 69 KB gzip chunk) after the first tap
+  - stores the Sound and Music toggles in localStorage
+- Layer volumes were balanced from offline renders (Tone.Offline in headless Edge) of each solo layer. Music sits about 6–10 dB under the SFX.
+- Measured cost: none visible. Still about 101 fps at 300 enemies with every layer playing.
+- SFX: see the SFX bank below.
+
+**Built (2026-10-28): the SFX bank.** Survivors-style punch (loud, layered hits, coins that climb the scale), with an old-sampler crunch and a haunted streak. It does not use Tone after all:
+- `synth.ts` is a tiny offline synth in plain TypeScript. It has:
+  - layers: oscillators with pitch and filter sweeps, FM, noise, Karplus-Strong plucks, metal clusters
+  - effects: drive, bit-crush, sample-and-hold, a small Schroeder reverb
+  - output: 32 kHz mono buffers
+- Why not Tone:
+  - a shot costs one `AudioBufferSourceNode` instead of a synth graph
+  - SFX work without the Tone chunk, so they still play with the music off
+  - every sound renders identically in Node, so tests check each one's level, peak and tail
+- `sfx-bank.ts` holds 44 recipes, each with variants, max voices, min gap, pitch jitter, a loudness target (loudest-30 ms RMS) and a priority:
+  - five weapon attacks plus the staff and Boomchin bursts
+  - blade, arrow and crit impacts
+  - a death per enemy family (zombie groan, bone clatter, slime bloops, werewolf yelp, elite gong)
+  - werewolf howl (transform), snarl (telegraph) and lunge
+  - Bob's hurt grunt, dodge and death wail
+  - coins in D minor pentatonic, food chomps, level-up
+  - wave horn, wave-clear bells, victory
+  - 15 menu sounds: rarity-scaled upgrade picks, buy, sell, reroll (bone dice), lock and unlock
+- `sfx.ts` maps sim events to sounds. It pans by distance from Bob and renders the bank in idle time after the first tap: about 0.45 s of work and 5 MB in total, and every sound was ready within 2.5 s in testing.
+- `VoicePool` enforces the per-sound gap and voice caps, plus a global cap where coins drop out first and Bob, elites and wave calls always play.
+- The sim's `enemyHit` event now says which weapon landed. Splash weapons sound once through their burst, not once per enemy caught in it.
+- Measured: still about 101 fps in a wave-10 horde with all five weapons and the music. The voice limiter drops most of the surplus hits there, as intended. A fight mixed over the music at game level averages about 5 dB above the music alone and never reaches the master limiter.
+
 > ⚠️ **License:** `@strudel/web` is **AGPL-3.0-or-later**. Two options:
 > - **(a) Recommended:** compose in Strudel and **bounce the patterns to OGG loops** that the game plays. No AGPL code ships.
 > - **(b)** Run Strudel live in-game for truly generative music. The client would then need to be AGPL-compatible, which effectively means open-sourcing it.
@@ -340,7 +379,7 @@ Skins unlock from achievements:
 ### Phase 2: Look & sound vertical slice (medium)
 - Batch-generate the Phase 2 rows of the §6 asset list, build the pack pipeline and swap in the atlas.
 - Procedural ground, fog, lighting mask and particles.
-- Tone.js SFX bank and adaptive music. Title screen, settings (volume, shake, haptics), pause.
+- SFX bank and adaptive music (**both done 2026-10-28**, see §7). Title screen, settings (volume, shake, haptics), pause.
 - PWA install + fullscreen. Deploy to static hosting for phone testing over HTTPS.
 - **Done when:** a shareable link plays a gorgeous, moody 10-wave run on a phone.
 

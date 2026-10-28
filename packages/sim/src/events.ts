@@ -15,6 +15,8 @@ export type SimEvent =
       readonly y: number;
       readonly amount: number;
       readonly crit: boolean;
+      /** What landed the hit (null for damage from no weapon). */
+      readonly weapon: WeaponId | null;
     }
   | {
       readonly type: 'enemyDeath';

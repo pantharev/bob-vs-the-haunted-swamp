@@ -441,6 +441,68 @@ button.card:hover {
   place-items: center;
 }
 
+/* ---------------------------------------------------------------- help, changelog, credit */
+
+.panel.info {
+  width: min(100%, 640px);
+}
+
+.info .lines {
+  margin: 0;
+  font-size: 14px;
+}
+
+.info .lines li {
+  /* Hang wrapped lines under the text, not the bullet. */
+  padding-left: 0.85em;
+  text-indent: -0.85em;
+}
+
+.info .lines li + li {
+  margin-top: 5px;
+}
+
+.info h2 small {
+  margin-left: 6px;
+  font: 13px var(--body);
+  color: var(--muted);
+  text-shadow: none;
+}
+
+.keys {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 14px;
+  margin: 0;
+}
+
+.keys dt {
+  color: var(--gold);
+  font-weight: bold;
+}
+
+.keys dd {
+  margin: 0;
+}
+
+.credit {
+  margin: 10px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+#ui a {
+  color: var(--gold);
+  font-weight: bold;
+  text-underline-offset: 2px;
+}
+
+#ui a:hover,
+#ui a:focus-visible {
+  color: var(--ink);
+}
+
 @media (max-width: 480px) {
   .panel {
     padding: 14px 12px 16px;
