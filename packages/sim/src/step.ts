@@ -1,61 +1,57 @@
-import { NEUTRAL_INPUT, type InputCommand } from './input';
-import type { Arena, Player, World } from './world';
+import { updateEnemies } from './enemies';
+import type { InputCommand } from './input';
+import { updatePickups } from './pickups';
+import { contactDamage, updatePlayers } from './player';
+import { endRun, endWave } from './run';
+import { updateSpawner } from './spawner';
+import { updateProjectiles, updateWeapons } from './weapons';
+import type { World } from './world';
 
-export const TICK_RATE = 60;
-/** Fixed sim timestep (s). Never varies: determinism depends on it. */
-export const DT = 1 / TICK_RATE;
+/** Recycled pools never grow past this. */
+const POOL_LIMIT = 512;
 
 /**
- * Fraction of the gap to target velocity closed each tick. 0.35 at 60 Hz
- * reaches 90% of top speed in ~5 ticks (~85 ms): snappy, but with enough
- * ramp for the procedural walk animation to read.
+ * Advance the world by exactly one tick. `inputs[i]` drives `world.players[i]`.
+ * Outside a wave (intermission, run over) the world is frozen.
  */
-const VELOCITY_RESPONSE = 0.35;
-/** Below this |moveX| the player keeps facing the same way. */
-const FACING_THRESHOLD = 0.1;
-
-/** Advance the world by exactly one tick. `inputs[i]` drives `world.players[i]`. */
 export function step(world: World, inputs: readonly InputCommand[]): void {
+  world.events.length = 0;
+  if (world.phase !== 'wave') return;
   world.tick++;
-  for (let i = 0; i < world.players.length; i++) {
-    movePlayer(world.players[i]!, inputs[i] ?? NEUTRAL_INPUT, world.arena);
-  }
+  world.waveTick++;
+  world.stats.timeTicks++;
+
+  updatePlayers(world, inputs);
+  updateSpawner(world);
+  updateEnemies(world);
+  // Enemies moved: rebuild the grid before anything queries positions.
+  world.grid.rebuild(world.enemies);
+  updateWeapons(world);
+  updateProjectiles(world);
+  contactDamage(world);
+  updatePickups(world);
+  updateGoo(world);
+
+  compact(world.enemies, world.pools.enemies);
+  compact(world.projectiles, world.pools.projectiles);
+  compact(world.pickups, world.pools.pickups);
+
+  if (world.players.every((p) => !p.alive)) endRun(world, 'defeat');
+  else if (world.waveTick >= world.waveTicks) endWave(world);
 }
 
-function movePlayer(p: Player, input: InputCommand, arena: Arena): void {
-  p.prevX = p.x;
-  p.prevY = p.y;
+function updateGoo(world: World): void {
+  let kept = 0;
+  for (const g of world.goo) if (--g.ticks > 0) world.goo[kept++] = g;
+  world.goo.length = kept;
+}
 
-  let mx = input.moveX;
-  let my = input.moveY;
-  // Math.sqrt is exactly specified across JS engines (unlike Math.hypot/sin),
-  // which keeps replays verifiable server-side.
-  const len = Math.sqrt(mx * mx + my * my);
-  if (len > 1) {
-    mx /= len;
-    my /= len;
+/** Drops dead entries in place (keeping order, so runs stay deterministic). */
+function compact<T extends { alive: boolean }>(list: T[], pool: T[]): void {
+  let kept = 0;
+  for (const item of list) {
+    if (item.alive) list[kept++] = item;
+    else if (pool.length < POOL_LIMIT) pool.push(item);
   }
-
-  p.vx += (mx * p.moveSpeed - p.vx) * VELOCITY_RESPONSE;
-  p.vy += (my * p.moveSpeed - p.vy) * VELOCITY_RESPONSE;
-  p.x += p.vx * DT;
-  p.y += p.vy * DT;
-
-  if (p.x < p.radius) {
-    p.x = p.radius;
-    p.vx = 0;
-  } else if (p.x > arena.width - p.radius) {
-    p.x = arena.width - p.radius;
-    p.vx = 0;
-  }
-  if (p.y < p.radius) {
-    p.y = p.radius;
-    p.vy = 0;
-  } else if (p.y > arena.height - p.radius) {
-    p.y = arena.height - p.radius;
-    p.vy = 0;
-  }
-
-  if (mx > FACING_THRESHOLD) p.facing = 1;
-  else if (mx < -FACING_THRESHOLD) p.facing = -1;
+  list.length = kept;
 }

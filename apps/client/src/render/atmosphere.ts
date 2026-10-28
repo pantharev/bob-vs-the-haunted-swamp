@@ -44,7 +44,15 @@ export class Atmosphere {
     this.root.addChild(this.light, this.outerDark);
   }
 
-  update(camera: Camera, focusX: number, focusY: number, screenW: number, screenH: number, dt: number) {
+  update(
+    camera: Camera,
+    focusX: number,
+    focusY: number,
+    screenW: number,
+    screenH: number,
+    dt: number,
+    lightScale = 1,
+  ) {
     this.time += dt;
     const s = camera.scale;
 
@@ -65,7 +73,7 @@ export class Atmosphere {
 
     // Lantern flicker: two slow sines, so it never looks like a regular pulse.
     const flicker = 1 + Math.sin(this.time * 7.3) * 0.012 + Math.sin(this.time * 2.1) * 0.018;
-    const size = LIGHT_REACH * 2 * s * flicker;
+    const size = LIGHT_REACH * 2 * s * flicker * lightScale;
     const cx = (focusX - camera.x) * s + screenW / 2;
     const cy = (focusY - camera.y) * s + screenH / 2;
     this.light.position.set(cx, cy);

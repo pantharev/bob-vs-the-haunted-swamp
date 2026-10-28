@@ -8,7 +8,7 @@ export default defineConfig([
   js.configs.recommended,
   tseslint.configs.recommended,
   {
-    files: ['apps/client/**/*.ts'],
+    files: ['apps/client/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
   },
   {
@@ -24,6 +24,12 @@ export default defineConfig([
         { object: 'Math', property: 'random', message: 'Use the seeded Rng (determinism).' },
         { object: 'Date', property: 'now', message: 'The sim must not read the wall clock.' },
         { object: 'performance', property: 'now', message: 'The sim must not read the wall clock.' },
+        // These may differ in the last bit between JS engines; see src/math.ts.
+        ...['sin', 'cos', 'tan', 'atan2', 'exp', 'pow', 'hypot', 'log', 'cbrt'].map((property) => ({
+          object: 'Math',
+          property,
+          message: 'Not exactly specified across engines; breaks replay checks. See src/math.ts.',
+        })),
       ],
     },
   },

@@ -12,6 +12,9 @@ const MIN_SCALE = 0.3;
 const FOLLOW_RATE = 9;
 /** How much void past the arena edge may come into view (wu). */
 const EDGE_MARGIN = 140;
+/** Screen shake at full trauma (wu), and how fast trauma fades (1/s). */
+const MAX_SHAKE = 14;
+const TRAUMA_DECAY = 1.8;
 
 export class Camera {
   x = 0;
@@ -20,10 +23,20 @@ export class Camera {
   /** Visible world size (wu). */
   viewWidth = 0;
   viewHeight = 0;
+  /** Shake offset to add on top of the follow position (wu). */
+  shakeX = 0;
+  shakeY = 0;
+  private trauma = 0;
+  private time = 0;
 
   snapTo(x: number, y: number): void {
     this.x = x;
     this.y = y;
+  }
+
+  /** Adds screen shake (0..1). Shake grows with trauma squared, so small hits stay subtle. */
+  shake(amount: number): void {
+    this.trauma = Math.min(1, this.trauma + amount);
   }
 
   update(
@@ -42,6 +55,13 @@ export class Camera {
     const k = 1 - Math.exp(-FOLLOW_RATE * dt);
     this.x = clampAxis(this.x + (targetX - this.x) * k, this.viewWidth, arena.width);
     this.y = clampAxis(this.y + (targetY - this.y) * k, this.viewHeight, arena.height);
+
+    this.time += dt;
+    this.trauma = Math.max(0, this.trauma - TRAUMA_DECAY * dt);
+    const shake = this.trauma * this.trauma * MAX_SHAKE;
+    // Incommensurate sines read as noise without a noise function.
+    this.shakeX = shake * (Math.sin(this.time * 47) * 0.6 + Math.sin(this.time * 83) * 0.4);
+    this.shakeY = shake * (Math.sin(this.time * 53) * 0.6 + Math.sin(this.time * 71) * 0.4);
   }
 }
 

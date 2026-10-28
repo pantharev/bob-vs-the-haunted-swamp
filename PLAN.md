@@ -1,6 +1,6 @@
 # Survivors-like: Bob vs. the Haunted Swamp — Game Plan
 
-> **Status:** Phase 0 in progress (started 2026-10-27). Working title is TBD.
+> **Status:** Phase 0 done (2026-10-27). Phase 1 built 2026-10-28 and waiting on the "is it fun?" play-test. Working title is TBD.
 > **Decided 2026-10-27:** inspired-by naming (no RuneScape names in the game) · PixiJS + own sim · art via GPT Image.
 > Library versions below were checked on npm today. Art is generated with GPT Image through the user's ChatGPT subscription (§6).
 
@@ -63,7 +63,7 @@ There are 6 slots. Weapons auto-fire at the nearest enemy.
 | Shortbow | Ranged | Rapid single-target arrows |
 | Crossbow | Ranged | Slow, piercing bolts |
 | Throwing knives | Ranged | 3-way spread |
-| Chinchompa | Ranged | Lobbed, explodes in AoE |
+| Boomchin (chinchompa nod) | Ranged | Lobbed, explodes in AoE |
 | Elemental staff | Magic | Strike → Bolt → Blast → Wave as it tiers up |
 | Frost burst staff | Magic | AoE freeze around Bob (Ancient Magicks nod) |
 | Cannon | Crafting | Deployable turret that rotates and fires |
@@ -159,7 +159,7 @@ art/manifests/     gpt-image batch manifests, one per asset set
 - **Fixed timestep** (60 Hz sim). The renderer interpolates between ticks and runs at display rate.
 - **Input commands, not key reads.** Each tick consumes a `{moveX, moveY, special}` command per player. Local play, network play and replays all feed the same thing.
 - **Seeded PRNG.** No `Math.random()` in the sim, so a run is reproducible from `seed + inputs` (enables daily challenges and replay checks).
-- **Pooled entities in struct-of-arrays form, plus a spatial hash grid** for collisions, enemy separation and "nearest enemy" queries. This is the main performance lever in this genre.
+- **Pooled entities plus a spatial hash grid** for collisions, enemy separation and "nearest enemy" queries. This is the main performance lever in this genre. Phase 1 uses pooled plain objects rather than struct-of-arrays: at the 300-enemy cap a tick costs ~0.23 ms on desktop, so SoA can wait until a phone profile says otherwise.
 - **Event stream** out of the sim (`hit`, `death`, `pickup`, `levelUp`, `waveEnd`…). Audio, VFX and UI subscribe to it, and later network clients consume the same events.
 
 ### Performance budget (target: mid-range Android at 60 fps)
@@ -326,11 +326,16 @@ Skins unlock from achievements:
 ### Phase 1: Core loop greybox (medium). *"Is it fun?" gate*
 - Zone 1 with 10 waves.
 - **4 enemies:** zombie, crawling hand, slime, werewolf.
-- **5 weapons:** scimitar, dagger, shortbow, staff, chinchompa.
+- **5 weapons:** scimitar, dagger, shortbow, staff, boomchin.
 - About 12 items, coins as XP + currency, skills level-up picks, shop (reroll + lock), HP and death, results screen.
 - Hitsplats, HP bars and basic juice (knockback, hit-flash, shake).
 - All art is placeholder shapes and all sound is placeholder blips.
 - **Done when:** a full 10-wave run is playable and *feels good*. Tune here before generating bulk art.
+- **Built (2026-10-28):** all of the above, plus 17 items, a weapon sell button, the coin bank, a title screen with starting-weapon choice, pause (Esc/P, button, auto on tab switch), mute (M) and placeholder Web Audio blips (Tone.js waits for Phase 2).
+  - All numbers live in `packages/content`. A headless bot (`packages/sim/test/bot.ts`) plays every weapon to the end of a run as a soak test; it currently clears all 10 waves in about 6 of 15 runs. It runs away from everything, so melee looks weaker in its numbers than it should.
+  - Dev shortcuts: `?weapon=staff&wave=5&seed=42` starts a run directly, and N skips to the end of the wave (dev builds only).
+  - Menus are Preact with JSX compiled by Vite's built-in oxc transform, so no `@preact/preset-vite` (which pulls in Babel).
+  - Known gap: menus need a mouse or touch. Gamepad menu navigation comes with Phase 2's settings work.
 
 ### Phase 2: Look & sound vertical slice (medium)
 - Batch-generate the Phase 2 rows of the §6 asset list, build the pack pipeline and swap in the atlas.

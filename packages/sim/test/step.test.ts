@@ -1,8 +1,12 @@
-import { BOB, ZONES } from '@game/content';
+import { BOB, ZONES, type ZoneDef } from '@game/content';
 import { describe, expect, it } from 'vitest';
 import { createWorld, step, TICK_RATE, type InputCommand, type World } from '../src';
 
-const zone = ZONES.wolfmoor;
+/** One long wave with no spawns, so movement can be tested in isolation. */
+const zone: ZoneDef = {
+  ...ZONES.wolfmoor,
+  waves: [{ duration: 600, hpScale: 1, damageScale: 1, spawns: [] }],
+};
 
 function run(world: World, input: InputCommand, ticks: number): void {
   for (let i = 0; i < ticks; i++) step(world, [input]);
