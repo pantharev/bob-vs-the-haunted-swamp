@@ -2,6 +2,7 @@ import { ELITE, ENEMIES, type EnemyId, type WeaponDef, type WeaponId } from '@ga
 import { MAX_ENEMY_RADIUS, MAX_GOO, MAX_PICKUPS, seconds } from './constants';
 import type { PickupKind } from './events';
 import { randomUnit, type Vec } from './math';
+import { scoreKill } from './score';
 import {
   armourFactor,
   classDamageMultiplier,
@@ -84,6 +85,7 @@ function killEnemy(world: World, e: Enemy, killer: Player): void {
   e.alive = false;
   e.hp = 0;
   world.stats.kills++;
+  scoreKill(world, e);
   world.events.push({
     type: 'enemyDeath',
     id: e.id,

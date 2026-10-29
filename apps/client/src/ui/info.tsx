@@ -1,15 +1,16 @@
-import { MAX_WEAPONS, ZONES } from '@game/content';
-import type { ComponentChildren } from 'preact';
+import { ELITE, ENEMIES, MAX_WEAPONS, SCORE, ZONES } from '@game/content';
 import { useState } from 'preact/hooks';
 import type { Game } from '../game';
 import { CHANGELOG, CREATOR } from './about';
-import { useHotkeys } from './app';
+import { formatScore } from './format';
+import { HiscoresScreen } from './hiscores';
+import { InfoPage } from './info-page';
 
 const touch = window.matchMedia('(pointer: coarse)').matches;
 
-export type InfoPageId = 'help' | 'changelog';
+export type InfoPageId = 'help' | 'changelog' | 'hiscores';
 
-/** Which info page is open over the title or pause screen, if any. */
+/** Which info page is open over the title, pause or results screen, if any. */
 export function useInfoPage(game: Game) {
   const [page, setPage] = useState<InfoPageId | null>(null);
   const open = (next: InfoPageId | null) => {
@@ -38,42 +39,23 @@ export function InfoButtons({
   );
 }
 
-export function InfoScreen({ page, onBack }: { page: InfoPageId; onBack: () => void }) {
-  return page === 'help' ? <HelpScreen onBack={onBack} /> : <ChangelogScreen onBack={onBack} />;
-}
-
-/** A page over the title or pause screen with a Back button; Escape goes back too. */
-function InfoPage({
-  title,
+export function InfoScreen({
+  game,
+  page,
   onBack,
-  children,
 }: {
-  title: string;
+  game: Game;
+  page: InfoPageId;
   onBack: () => void;
-  children: ComponentChildren;
 }) {
-  useHotkeys(
-    (code) => {
-      if (code === 'Escape' || code === 'Backspace') {
-        onBack();
-        return true;
-      }
-    },
-    [onBack],
-  );
-  return (
-    <div class="screen">
-      <div class="panel info">
-        <h1>{title}</h1>
-        {children}
-        <div class="actions">
-          <button class="primary" onClick={onBack}>
-            Back
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  switch (page) {
+    case 'help':
+      return <HelpScreen onBack={onBack} />;
+    case 'changelog':
+      return <ChangelogScreen onBack={onBack} />;
+    case 'hiscores':
+      return <HiscoresScreen game={game} onBack={onBack} />;
+  }
 }
 
 export function HelpScreen({ onBack }: { onBack: () => void }) {
@@ -140,6 +122,26 @@ export function HelpScreen({ onBack }: { onBack: () => void }) {
           about to lunge.
         </li>
         <li>Elites are huge, tough, and drop a pile of coins.</li>
+      </ul>
+
+      <h2>Score and hiscores</h2>
+      <ul class="lines">
+        <li>
+          Kills: {ENEMIES.zombie.points} for a zombie, {ENEMIES.hand.points} for a crawling hand,{' '}
+          {ENEMIES.slime.points} for a bog slime (less for the bits it splits into),{' '}
+          {ENEMIES.werewolf.points} for a werewolf. Elites are worth {ELITE.points}×.
+        </li>
+        <li>
+          Surviving wave N earns N × {SCORE.waveBonus}, scaled by the HP you have left when it ends.
+          Dodging pays.
+        </li>
+        <li>
+          Clearing all {ZONES.wolfmoor.waves.length} waves adds {formatScore(SCORE.victoryBonus)}.
+        </li>
+        <li>
+          Post your score from the results screen. The server replays your run to check it, so the
+          hiscores stay honest. The weekly board resets every Monday (UTC).
+        </li>
       </ul>
     </InfoPage>
   );

@@ -19,6 +19,7 @@ export class Hud {
   private readonly levelText = text(13);
   private readonly coinText = text(17);
   private readonly bankText = text(13);
+  private readonly scoreText = text(13);
   private readonly waveText = text(14);
   private readonly timerText = text(30);
   private readonly safe = SafeArea.shared();
@@ -53,9 +54,10 @@ export class Hud {
     this.coinText.position.set(22, 45);
     this.bankText.anchor.set(0, 0.5);
     this.bankText.tint = 0xffd75a;
+    this.scoreText.position.set(0, 62);
 
     this.left.addChild(hpFrame, hpBack, this.hpFill, this.hpText, xpBack, this.xpFill, this.levelText);
-    this.left.addChild(coin, this.coinText, this.bankText);
+    this.left.addChild(coin, this.coinText, this.bankText, this.scoreText);
 
     this.waveText.anchor.set(0.5, 0);
     this.timerText.anchor.set(0.5, 0);
@@ -82,6 +84,7 @@ export class Hud {
     this.set(this.coinText, String(p.coins));
     this.bankText.x = this.coinText.x + this.coinText.width + 8;
     this.set(this.bankText, p.bank > 0 ? `+${p.bank} banked` : '');
+    this.set(this.scoreText, `SCORE ${world.stats.score.toLocaleString('en-US')}`);
 
     const left = Math.max(0, Math.ceil((world.waveTicks - world.waveTick) / 60));
     this.set(this.waveText, `WAVE ${world.wave} / ${world.waves.length}`);

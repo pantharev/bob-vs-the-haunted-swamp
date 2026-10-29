@@ -3,9 +3,12 @@ import {
   applyAction,
   buyBlocker,
   createWorld,
+  ReplayRecorder,
   step,
   type InputCommand,
   type Player,
+  type Replay,
+  type RunAction,
   type RunOutcome,
   type World,
 } from '../src';
@@ -92,8 +95,12 @@ export function botInput(world: World, p: Player): InputCommand {
   return len > 0.001 ? { moveX: ax / len, moveY: ay / len } : { moveX: 0, moveY: 0 };
 }
 
-/** Spends the intermission: best upgrade card, then greedy shopping, then ready. */
-export function botIntermission(world: World, index: number): void {
+/** Spends the intermission: best upgrade card, then greedy shopping, then ready. `act` applies each choice. */
+export function botIntermission(
+  world: World,
+  index: number,
+  act: (action: RunAction) => boolean = (action) => applyAction(world, index, action),
+): void {
   for (let guard = 0; guard < 200 && world.phase === 'intermission'; guard++) {
     const p = world.players[index]!;
     if (p.intermission === 'levelUp') {
@@ -105,15 +112,15 @@ export function botIntermission(world: World, index: number): void {
           (u.rarity === b.rarity && SKILL_PRIORITY.indexOf(u.skill) < SKILL_PRIORITY.indexOf(b.skill));
         if (better) best = i;
       });
-      applyAction(world, index, { type: 'chooseUpgrade', index: best });
+      act({ type: 'chooseUpgrade', index: best });
     } else if (p.intermission === 'shop') {
       const buyable = p.shop
         .map((offer, i) => ({ offer, i }))
         .filter(({ offer }) => buyBlocker(p, offer) === null)
         .sort((a, b) => score(b.offer, p) - score(a.offer, p));
       const pick = buyable[0];
-      if (pick) applyAction(world, index, { type: 'buy', index: pick.i });
-      else applyAction(world, index, { type: 'ready' });
+      if (pick) act({ type: 'buy', index: pick.i });
+      else act({ type: 'ready' });
     } else {
       return;
     }
@@ -167,4 +174,31 @@ export function runBot(
     seconds: Math.round(world.stats.timeTicks / 60),
     maxEnemies,
   };
+}
+
+/**
+ * A bot run played the way the client plays: every command and accepted action
+ * goes through a ReplayRecorder. `onTick` sees the world after each wave tick.
+ */
+export function recordBot(
+  seed: number,
+  zone: ZoneDef,
+  weapon: WeaponId,
+  onTick?: (world: World) => void,
+): { world: World; replay: Replay } {
+  const world = createWorld({ seed, zone, weapons: [weapon] });
+  const recorder = new ReplayRecorder(seed, weapon);
+  for (let guard = 0; guard < 60 * 60 * 20 && world.phase !== 'over'; guard++) {
+    if (world.phase === 'intermission') {
+      botIntermission(world, 0, (action) => {
+        const ok = applyAction(world, 0, action);
+        if (ok) recorder.action(action);
+        return ok;
+      });
+      continue;
+    }
+    step(world, [recorder.input(botInput(world, world.players[0]!))]);
+    onTick?.(world);
+  }
+  return { world, replay: recorder.finish() };
 }

@@ -5,18 +5,20 @@
   "scripts": {
     "dev": "vite",
     "dev:lan": "vite --host",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run typecheck && vite build && vite build -c vite.api.config.ts && node scripts/vercel-output.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p server"
   },
   "dependencies": {
     "@game/content": "*",
     "@game/sim": "*",
+    "@upstash/redis": "^1.40.0",
     "pixi.js": "^8.22.0",
     "preact": "^11.1.0",
     "tone": "^15.1.22"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "typescript": "~6.0.3",
     "vite": "^8.3.5"
   }

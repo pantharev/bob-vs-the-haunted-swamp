@@ -1,0 +1,9 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    // Node only: the API runs as a Vercel function and inside the Vite dev server.
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["."]
+}

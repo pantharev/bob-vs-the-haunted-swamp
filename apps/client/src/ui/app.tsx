@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { Game } from '../game';
+import { typingIn } from '../input/keyboard';
 import { LevelUpScreen } from './level-up';
 import { PauseScreen } from './pause';
 import { ResultsScreen } from './results';
@@ -61,7 +62,7 @@ function App({ game }: { game: Game }) {
 export function useHotkeys(handler: (code: string) => boolean | void, deps: unknown[]): void {
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
-      if (e.repeat) return;
+      if (e.repeat || typingIn(e)) return;
       const focused = document.activeElement;
       if ((e.code === 'Enter' || e.code === 'Space') && focused && focused !== document.body) return;
       if (handler(e.code)) e.preventDefault();

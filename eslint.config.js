@@ -4,7 +4,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  globalIgnores(['**/dist/**', '**/node_modules/**', 'art/**', 'generated-images/**']),
+  globalIgnores(['**/dist/**', '**/.vercel/**', '**/node_modules/**', 'art/**', 'generated-images/**']),
   js.configs.recommended,
   tseslint.configs.recommended,
   {
@@ -12,7 +12,13 @@ export default defineConfig([
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['tools/**/*.mjs', '*.config.{js,ts}', 'apps/*/vite.config.ts'],
+    files: [
+      'tools/**/*.mjs',
+      '*.config.{js,ts}',
+      'apps/*/vite*.config.ts',
+      'apps/client/server/**/*.ts',
+      'apps/client/scripts/**/*.{ts,mjs}',
+    ],
     languageOptions: { globals: globals.node },
   },
   {

@@ -1,6 +1,6 @@
 # Survivors-like: Bob vs. the Haunted Swamp — Game Plan
 
-> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Working title is TBD.
+> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Working title is TBD.
 > **Decided 2026-10-27:** inspired-by naming (no RuneScape names in the game) · PixiJS + own sim · art via GPT Image.
 > Library versions below were checked on npm today. Art is generated with GPT Image through the user's ChatGPT subscription (§6).
 
@@ -129,7 +129,7 @@ Run modifiers: **difficulty 0–5**, and **Ironman** (no shop, only drops), whic
 | Simulation | Own pure-TS package `@game/sim` | Runs headless in Node for multiplayer, bot balancing and replay verification |
 | Menus/shop UI | **Preact 11** DOM overlay | Crisp text, accessible, easy responsive layout; the in-run HUD stays in Pixi for performance |
 | Audio | **Tone.js 15.1** + plain-TS synth | Adaptive music (Tone); SFX rendered offline in TS; Strudel later (§7) |
-| Backend | **Supabase** (supabase-js 2.118): Auth, Postgres, Edge Functions | Hiscores, skins, achievements, cloud save |
+| Backend | **Vercel** (static site + Node functions) + **Upstash Redis** (@upstash/redis 1.40) | Hiscores, with every run replayed on the server (§8). Accounts, achievements and cloud save TBD |
 | Multiplayer (later) | **socket.io 4.8** on Node, hosted on Fly.io/Railway | Needs a persistent server, not serverless |
 | Mobile | PWA (vite-plugin-pwa 2.0); Capacitor later if we go to app stores | Install to home screen, fullscreen, offline |
 | Art generation | **`gpt-image` skill** (Codex CLI + ChatGPT sign-in) | Subscription-backed, real transparent PNGs, reference-guided consistency |
@@ -141,7 +141,8 @@ Run modifiers: **difficulty 0–5**, and **Ironman** (no shop, only drops), whic
 ### Repo layout
 ```
 apps/
-  client/          Vite app: Pixi renderer, input, Preact UI, Tone audio, Supabase client
+  client/          Vite app: Pixi renderer, input, Preact UI, Tone audio, hiscores client
+    server/        the hiscores API (Vercel functions, also served by the Vite dev server)
   server/          (Phase 5) Node + socket.io, imports @game/sim
 packages/
   sim/             pure TS: world state, systems, waves, weapons, seeded RNG — NO DOM
@@ -292,35 +293,41 @@ Two rules keep a horde from turning into noise:
 
 ---
 
-## 8. Backend (Supabase)
+## 8. Backend: hiscores on Vercel + Upstash Redis
 
-**Auth**
-- **Anonymous sign-in by default** (`signInAnonymously`), so anyone can post hiscores without an account.
-- **Optional Google** via `linkIdentity({ provider: 'google' })`, which upgrades the guest account to Google and keeps all progress. Requires manual identity linking in Supabase.
-- Login is never forced.
+**Built (2026-10-28).** Replaces the Supabase plan for hiscores. Accounts, achievements and cloud save are still open: Upstash can hold them too, or a separate auth provider joins later.
 
-**Schema sketch**
-```sql
-profiles(id uuid pk → auth.users, display_name, equipped_skin, created_at)
-runs(id, user_id, zone, difficulty, mode /*normal|ironman|coop*/, seed,
-     wave_reached, kills, duration_ms, score, build jsonb, client_version, created_at)
-achievements(id text pk, name, description, hidden bool)        -- static defs
-user_achievements(user_id, achievement_id, unlocked_at)
-skins(id text pk, name, unlock_achievement_id)                   -- static defs
-user_skins(user_id, skin_id, unlocked_at)
-user_progress(user_id pk, lifetime_stats jsonb, unlocks jsonb, updated_at)
--- views: hiscores_alltime / hiscores_weekly per (zone, difficulty, mode)
-```
+**Score** (`packages/sim/src/score.ts`, numbers in `packages/content/src/score.ts`). It is computed inside the sim, so the server recomputes it from a replay.
+- **Kills:** each enemy has `points` (zombie 10, crawling hand 5, bog slime 15/5/2 for the splits, werewolf 50); elites are worth ×10.
+- **Wave bonus:** surviving wave N pays N × 100, scaled by the fraction of HP left when it ends (dead players count 0). Rewards dodging, which is what separates players once everyone can win.
+- **Victory:** +2,500 for clearing the last wave.
+- Bot runs land around 7–14k for a win; kills are roughly half of a winning score.
 
-**Security**
-- RLS lets everyone read hiscores. Users can read and write only their own profile and progress.
-- **`runs` has no direct insert.** Runs go through a `submit-run` Edge Function that checks plausibility (score vs. duration vs. wave, client version) and rate-limits.
-- Later hardening: **replay verification**. The client sends `seed + input log`, and the server re-simulates with `@game/sim`.
-- Caveat: JS trig can differ slightly between V8 and Safari's JSC. If we go this route, the sim uses its own trig tables.
+**Replays** (`packages/sim/src/replay.ts`). A solo run is its seed, starting weapon, one movement command per wave tick and the between-wave actions.
+- Movement is quantized to 1/127 steps per axis before the sim sees it, live and in replays, so both step with identical numbers. Runs of identical commands are run-length coded: a keyboard run is a few kB, a joystick run under 100 kB.
+- `replayRun` re-runs to the end and rejects anything malformed, refused actions, and recordings that end early or late.
+- A full 7-minute run replays in under a second in Node.
+- The sim avoids engine-dependent float math (see `src/math.ts` and the lint rule), so Chrome, Firefox and Safari runs replay the same in Node.
 
-**Local-first:** progress lives in IndexedDB and syncs to Supabase when signed in. Offline play always works.
+**API** (`apps/client/server/`, one bundle deployed as three Vercel functions):
+- `POST /api/ticket {player}` → `{ticket, seed}`. The server picks every ranked run's seed (no seed shopping) and remembers it for 24 h.
+- `POST /api/runs {ticket, player, name, rules, score, replay}`. Takes the ticket once (GETDEL), checks it belongs to this player and seed, re-runs the replay, and requires the server's score to equal the client's. The run's wave time must fit between the ticket and the submission, so runs can't be simulated faster than real time. Then it records the server's own score.
+- `GET /api/hiscores?board=week|all&player=…` → top 50 plus the player's own row. Shared responses (no player) are CDN-cached for 10 s.
+- `rules` is a hash of the sim and content sources, injected at build time (`scripts/rules-version.ts`). A client on older rules gets "reload to post" instead of a mismatch.
+- Rate limits per IP per minute: 30 tickets, 10 runs, 120 board reads.
 
-**Hiscores page:** a RuneScape-style table with rank, name, wave, kills and time, filterable by zone, difficulty and mode, for this week or all time.
+**Players:** no accounts. A random 128-bit id lives in localStorage, and the name is chosen on the results screen (1–16 letters, digits, spaces, - or _). Ids never appear in API responses.
+
+**Redis layout** (prefix `bob:s1`; bump `SEASON` in `server/api.ts` to start fresh boards):
+- `:ticket:<id>` JSON, 24 h TTL.
+- `:all` and `:week:<ISO week>`: sorted sets of player → best score (`ZADD GT CH`), each with a `:runs` hash of that best run's details. Weekly boards expire after 8 weeks.
+- `:rate:<kind>:<ip>:<minute>` counters.
+
+**Deploy:** `npm run build` in `apps/client` also bundles the API (`vite.api.config.ts`) and assembles `.vercel/output` (Build Output API v3, `scripts/vercel-output.mjs`), which Vercel deploys as-is. Credentials come from Vercel's Upstash integration (`KV_REST_API_URL` / `KV_REST_API_TOKEN`, or the `UPSTASH_REDIS_REST_*` names). Without them the API answers 503 and runs are simply unranked.
+
+**Local dev:** `npm run dev` serves the same API from a Vite plugin, on an in-memory store, or on Upstash if `.env.local` has credentials.
+
+**Not done yet:** a name filter (bad names are removed by hand in the Upstash console: `ZREM` from both boards plus `HDEL` from their `:runs` hashes), per-weapon boards, and co-op runs.
 
 **Achievements and skins (examples)**
 - "Slayer task: 500 crawling hands"
@@ -347,7 +354,7 @@ Skins unlock from achievements:
   - Projectiles are sent as spawn events and simulated client-side to save bandwidth.
 - **Why not lockstep?** It would be cheaper for bandwidth, but cross-browser floating-point/trig desyncs make it fragile.
 - **Rooms:** 6-character room codes first, quick-match later.
-- **Auth:** the socket handshake carries the Supabase JWT, which the server verifies.
+- **Auth:** the socket handshake carries the player's token (provider TBD, §8), which the server verifies.
 - **Hosting:** the client is static on Cloudflare Pages/Vercel/Netlify; the socket server runs on **Fly.io** or Railway.
 - **What we do now to keep this cheap:** the sim never touches the DOM or the clock, input is commands, and entities have stable IDs.
 
@@ -383,10 +390,10 @@ Skins unlock from achievements:
 - PWA install + fullscreen. Deploy to static hosting for phone testing over HTTPS.
 - **Done when:** a shareable link plays a gorgeous, moody 10-wave run on a phone.
 
-### Phase 3: Accounts, hiscores, achievements (small–medium)
-- Supabase project, migrations, RLS, anonymous auth plus optional Google linking.
-- `submit-run` Edge Function, hiscores page, about 10 achievements, skin unlocks and equip, cloud save sync.
-- **Done when:** guest and Google players appear on weekly and all-time hiscores, unlock a skin, and keep it across devices.
+### Phase 3: Hiscores, then accounts and achievements (small–medium)
+- **Done (2026-10-28):** score, replay-verified hiscores on Vercel + Upstash, weekly and all-time boards, hiscores page, score on the HUD and results screen (§8).
+- Next: accounts (provider TBD), about 10 achievements, skin unlocks and equip, cloud save sync.
+- **Done when:** players appear on weekly and all-time hiscores (done), unlock a skin, and keep it across devices.
 
 ### Phase 4: Content depth (large)
 - 20 waves, the full bestiary, the Alpha Werewolf and Abyssal Overlord bosses.
@@ -439,6 +446,6 @@ Skins unlock from achievements:
 | ~~Project lives in OneDrive~~ | Resolved: moved to `C:\Projects\3d_killa` |
 | **Windows line endings** (global `core.autocrlf=true`) | Add `.gitattributes` with `* text=auto eol=lf` in Phase 0 so scripts and regex-based tooling behave the same everywhere |
 | **Strudel AGPL** | Bounce Strudel compositions to audio files (§7) |
-| **Score cheating** | Edge Function plausibility checks now, replay verification later |
+| **Score cheating** | **Done:** the server picks the seed, replays every posted run and records its own score (§8). Bots that play in real time remain possible |
 | **iOS Safari audio quirks** | Gesture unlock, audioSession, resume on visibility change |
 | **Low-end Android performance** | Atlas + ParticleContainer + spatial hash + entity caps + auto quality scaling |

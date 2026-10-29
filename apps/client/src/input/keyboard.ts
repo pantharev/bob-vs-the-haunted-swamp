@@ -16,7 +16,7 @@ export class KeyboardInput {
 
   constructor() {
     window.addEventListener('keydown', (e) => {
-      if (!Object.hasOwn(BINDINGS, e.code)) return;
+      if (!Object.hasOwn(BINDINGS, e.code) || typingIn(e)) return;
       this.held.add(e.code);
       e.preventDefault();
     });
@@ -40,4 +40,13 @@ export class KeyboardInput {
   reset(): void {
     this.held.clear();
   }
+}
+
+/** Keys pressed while a text field has focus belong to the field (a hiscores name), not the game. */
+export function typingIn(e: KeyboardEvent): boolean {
+  const target = e.target;
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+  );
 }

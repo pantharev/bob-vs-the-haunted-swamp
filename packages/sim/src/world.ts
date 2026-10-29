@@ -194,6 +194,11 @@ export interface RunStats {
   coinsCollected: number;
   /** Ticks spent inside waves. */
   timeTicks: number;
+  /** killPoints + waveBonus + victoryBonus (see SCORE in content). */
+  score: number;
+  killPoints: number;
+  waveBonus: number;
+  victoryBonus: number;
 }
 
 export interface World {
@@ -298,7 +303,16 @@ export function createWorldState(
     nextId: 1,
     grid: new SpatialGrid(arena.width, arena.height),
     events: [],
-    stats: { kills: 0, damageDealt: 0, coinsCollected: 0, timeTicks: 0 },
+    stats: {
+      kills: 0,
+      damageDealt: 0,
+      coinsCollected: 0,
+      timeTicks: 0,
+      score: 0,
+      killPoints: 0,
+      waveBonus: 0,
+      victoryBonus: 0,
+    },
     pools: { enemies: [], projectiles: [], pickups: [] },
   };
 }

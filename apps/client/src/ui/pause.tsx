@@ -4,7 +4,7 @@ import { SoundToggles } from './sound-toggles';
 
 export function PauseScreen({ game }: { game: Game }) {
   const [page, open] = useInfoPage(game);
-  if (page) return <InfoScreen page={page} onBack={() => open(null)} />;
+  if (page) return <InfoScreen game={game} page={page} onBack={() => open(null)} />;
 
   return (
     <div class="screen">

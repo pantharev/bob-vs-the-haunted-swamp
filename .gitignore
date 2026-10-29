@@ -9,3 +9,7 @@ generated-images/
 
 # local game.mjs session state
 .codegpt-game/
+
+# Vercel build output and local env (Upstash credentials)
+.vercel/
+.env*.local

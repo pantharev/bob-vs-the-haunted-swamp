@@ -10,6 +10,7 @@ import { WOLFMOOR_WAVES, type WaveDef } from './waves';
 
 export * from './enemies';
 export * from './items';
+export * from './score';
 export * from './skills';
 export * from './waves';
 export * from './weapons';

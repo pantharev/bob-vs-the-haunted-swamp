@@ -115,3 +115,8 @@ export function formatTime(ticks: number): string {
   const total = Math.round(ticks / 60);
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
+
+/** 12,345 */
+export function formatScore(points: number): string {
+  return points.toLocaleString('en-US');
+}

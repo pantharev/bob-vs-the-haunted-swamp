@@ -23,7 +23,7 @@ export function TitleScreen({ game }: { game: Game }) {
     [weapon, page],
   );
 
-  if (page) return <InfoScreen page={page} onBack={() => open(null)} />;
+  if (page) return <InfoScreen game={game} page={page} onBack={() => open(null)} />;
 
   return (
     <div class="screen">
@@ -65,6 +65,9 @@ export function TitleScreen({ game }: { game: Game }) {
           </button>
         </div>
         <div class="actions">
+          <button class="small" onClick={() => open('hiscores')}>
+            Hiscores
+          </button>
           <InfoButtons onOpen={open} small />
           <SoundToggles game={game} small />
         </div>

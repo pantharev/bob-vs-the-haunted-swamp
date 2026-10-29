@@ -2,6 +2,7 @@ import { BOB, type CharacterDef, type WeaponId, type ZoneDef } from '@game/conte
 import { seconds } from './constants';
 import type { RunOutcome } from './events';
 import { gainXp } from './combat';
+import { scoreVictory, scoreWave } from './score';
 import { openShop } from './shop';
 import { recomputeStats } from './stats';
 import { rollUpgrades } from './upgrades';
@@ -68,6 +69,8 @@ export function startWave(world: World, wave: number): void {
 /** Wave timer ran out: clear the arena, bank loose coins, then intermission or victory. */
 export function endWave(world: World): void {
   world.events.push({ type: 'waveEnd', wave: world.wave });
+  // Before anything heals: the bonus rewards the HP the wave left you with.
+  scoreWave(world);
 
   for (const e of world.enemies) {
     world.events.push({
@@ -97,6 +100,7 @@ export function endWave(world: World): void {
   });
 
   if (world.wave >= world.waves.length) {
+    scoreVictory(world);
     endRun(world, 'victory');
     return;
   }

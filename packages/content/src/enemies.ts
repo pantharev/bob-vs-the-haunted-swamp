@@ -32,6 +32,8 @@ export interface EnemyDef {
   /** Coins dropped on death, with `coinChance` probability. */
   readonly coins: number;
   readonly coinChance: number;
+  /** Score for killing one (PLAN.md §8). Elites are worth `ELITE.points` times this. */
+  readonly points: number;
   /** Knockback resistance (1 = normal). */
   readonly mass: number;
   readonly tags: readonly EnemyTag[];
@@ -52,6 +54,7 @@ export const ENEMIES: Readonly<Record<EnemyId, EnemyDef>> = {
     damage: 4,
     coins: 1,
     coinChance: 1,
+    points: 10,
     mass: 1,
     tags: ['undead'],
     behaviour: 'chase',
@@ -65,6 +68,7 @@ export const ENEMIES: Readonly<Record<EnemyId, EnemyDef>> = {
     damage: 2,
     coins: 1,
     coinChance: 0.6,
+    points: 5,
     mass: 0.6,
     tags: ['undead'],
     behaviour: 'flank',
@@ -78,6 +82,7 @@ export const ENEMIES: Readonly<Record<EnemyId, EnemyDef>> = {
     damage: 4,
     coins: 1,
     coinChance: 1,
+    points: 15,
     mass: 1.5,
     tags: [],
     behaviour: 'chase',
@@ -93,6 +98,7 @@ export const ENEMIES: Readonly<Record<EnemyId, EnemyDef>> = {
     damage: 3,
     coins: 1,
     coinChance: 1,
+    points: 5,
     mass: 1,
     tags: [],
     behaviour: 'chase',
@@ -108,6 +114,7 @@ export const ENEMIES: Readonly<Record<EnemyId, EnemyDef>> = {
     damage: 2,
     coins: 1,
     coinChance: 0.5,
+    points: 2,
     mass: 0.6,
     tags: [],
     behaviour: 'chase',
@@ -122,6 +129,7 @@ export const ENEMIES: Readonly<Record<EnemyId, EnemyDef>> = {
     damage: 6,
     coins: 3,
     coinChance: 1,
+    points: 50,
     mass: 2,
     tags: ['beast', 'tough'],
     behaviour: 'werewolf',
@@ -144,4 +152,5 @@ export const ELITE = {
   damage: 1.5,
   coins: 4,
   mass: 3,
+  points: 10,
 } as const;

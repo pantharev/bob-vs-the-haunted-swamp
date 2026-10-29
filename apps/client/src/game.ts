@@ -1,11 +1,23 @@
 import { ZONES, type WeaponId, type ZoneDef } from '@game/content';
-import { applyAction, createWorld, DT, step, type RunAction, type World } from '@game/sim';
+import {
+  applyAction,
+  createWorld,
+  DT,
+  quantizeInput,
+  ReplayRecorder,
+  step,
+  type RunAction,
+  type World,
+} from '@game/sim';
 import type { Application } from 'pixi.js';
 import type { GameAudio } from './audio/audio';
 import type { MusicScene } from './audio/music';
 import type { UiSound } from './audio/sfx-bank';
 import type { DebugOverlay } from './debug/overlay';
+import { HiscoreError, Hiscores } from './hiscores/client';
+import type { SubmitResponse } from './hiscores/protocol';
 import type { Input } from './input/input';
+import { typingIn } from './input/keyboard';
 import type { GameView } from './render/game-view';
 
 /** Longest frame we simulate; anything slower is treated as a hitch, not lost time. */
@@ -23,9 +35,17 @@ export type Screen = 'title' | 'run';
 
 export interface RunOptions {
   weapon: WeaponId;
+  /** Debug: a fixed seed. The run can't be ranked. */
   seed?: number;
-  /** Debug: start at a later wave. */
+  /** Debug: start at a later wave. The run can't be ranked. */
   wave?: number;
+}
+
+/** A run that can go on the hiscores: its ticket, and the replay being recorded. */
+interface RankedRun {
+  readonly ticket: string;
+  readonly recorder: ReplayRecorder;
+  posted: SubmitResponse | null;
 }
 
 /**
@@ -37,6 +57,8 @@ export class Game {
   paused = false;
   world: World;
   lastWeapon: WeaponId = 'scimitar';
+  readonly hiscores = new Hiscores();
+  private ranked: RankedRun | null = null;
   private accumulator = 0;
   private readonly listeners = new Set<() => void>();
 
@@ -56,6 +78,7 @@ export class Game {
       input.reset();
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
+    this.hiscores.prefetch();
   }
 
   subscribe(listener: () => void): () => void {
@@ -69,8 +92,14 @@ export class Game {
 
   startRun({ weapon, seed, wave }: RunOptions): void {
     this.lastWeapon = weapon;
+    // Only a normal start can be ranked: the server picks the seed and the run starts at wave 1.
+    const ticket = seed === undefined && wave === undefined ? this.hiscores.take() : null;
+    const runSeed = ticket?.seed ?? seed ?? Date.now() >>> 0;
+    this.ranked = ticket
+      ? { ticket: ticket.ticket, recorder: new ReplayRecorder(runSeed, weapon), posted: null }
+      : null;
     this.world = createWorld({
-      seed: seed ?? Date.now() >>> 0,
+      seed: runSeed,
       zone: ZONES.wolfmoor,
       weapons: [weapon],
       startWave: wave,
@@ -114,10 +143,36 @@ export class Game {
     this.notify();
   }
 
+  /** Whether the finished (or current) run can be posted to the hiscores. */
+  get rankable(): boolean {
+    return this.ranked !== null;
+  }
+
+  /** The hiscores' answer if this run was posted. */
+  get posted(): SubmitResponse | null {
+    return this.ranked?.posted ?? null;
+  }
+
+  /** Posts the finished run. The server re-runs the replay and answers with its own score and ranks. */
+  async postScore(name: string): Promise<SubmitResponse> {
+    const ranked = this.ranked;
+    if (!ranked || this.world.phase !== 'over') throw new HiscoreError("This run can't be posted.");
+    ranked.posted = await this.hiscores.submit({
+      ticket: ranked.ticket,
+      name,
+      rules: __RULES__,
+      score: this.world.stats.score,
+      replay: ranked.recorder.finish(),
+    });
+    this.notify();
+    return ranked.posted;
+  }
+
   /** A between-wave choice from the UI. Returns false if the sim refused it. */
   act(action: RunAction): boolean {
     const sound = this.actionSound(action);
     const ok = applyAction(this.world, 0, action);
+    if (ok) this.ranked?.recorder.action(action);
     this.audio.ui(ok ? sound : 'error');
     this.consume();
     if (ok && this.world.phase === 'wave') {
@@ -138,7 +193,10 @@ export class Game {
       const simStart = performance.now();
       let steps = 0;
       while (this.accumulator >= DT && steps < MAX_STEPS_PER_FRAME) {
-        step(world, [this.input.sample()]);
+        // Quantized so a replay of this run steps with exactly the same numbers.
+        const command = quantizeInput(this.input.sample());
+        this.ranked?.recorder.input(command);
+        step(world, [command]);
         this.consume();
         this.accumulator -= DT;
         steps++;
@@ -222,14 +280,15 @@ export class Game {
 
   private onKey(e: KeyboardEvent): void {
     // A menu already handled it (see useHotkeys).
-    if (e.repeat || e.defaultPrevented) return;
+    if (e.repeat || e.defaultPrevented || typingIn(e)) return;
     if (e.code === 'Escape' || e.code === 'KeyP') {
       if (this.inWave) this.setPaused(!this.paused);
     } else if (e.code === 'KeyM') {
       this.toggleMute();
     } else if (import.meta.env.DEV && e.code === 'KeyN' && this.inWave) {
-      // Dev shortcut: skip to the end of the wave.
+      // Dev shortcut: skip to the end of the wave. That isn't in the replay, so the run is unranked.
       this.world.waveTick = Math.max(this.world.waveTick, this.world.waveTicks - 1);
+      this.ranked = null;
     }
   }
 

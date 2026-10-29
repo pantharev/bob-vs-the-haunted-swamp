@@ -14,6 +14,17 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '0.4',
+    date: '2026-10-28',
+    title: 'Hiscores',
+    notes: [
+      'A score for every run: points for each kill (elites are worth a lot), a bonus for each wave you survive that grows with the HP you keep, and a big bonus for winning.',
+      'Hiscores for this week and all time. Post a run from the results screen with the name you choose.',
+      'Every posted run is replayed on the server to check its score.',
+      'Your score is on screen during a run.',
+    ],
+  },
+  {
     version: '0.3',
     date: '2026-10-28',
     title: 'Sound',
