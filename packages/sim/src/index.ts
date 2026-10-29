@@ -2,6 +2,7 @@ export { applyAction, type RunAction } from './actions';
 export { DT, MAX_ENEMIES, TICK_RATE } from './constants';
 export type { PickupKind, RunOutcome, SimEvent } from './events';
 export { NEUTRAL_INPUT, type InputCommand } from './input';
+export { worldHash } from './hash';
 export { Rng, type RngState } from './rng';
 export {
   quantizeInput,

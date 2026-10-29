@@ -1,6 +1,6 @@
 # Survivors-like: Bob vs. the Haunted Swamp — Game Plan
 
-> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Working title is TBD.
+> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a, the cross-browser determinism check, is in progress. Working title is TBD.
 > **Decided 2026-10-27:** inspired-by naming (no RuneScape names in the game) · PixiJS + own sim · art via GPT Image.
 > Library versions below were checked on npm today. Art is generated with GPT Image through the user's ChatGPT subscription (§6).
 
@@ -344,21 +344,77 @@ Skins unlock from achievements:
 
 ---
 
-## 9. Multiplayer (Phase 5, prepared from Phase 0)
+## 9. Co-op multiplayer (agreed 2026-10-29)
 
-- **Mode:** 2–4 player **co-op**. Shared waves, enemy HP/count scaled by player count, each player shops separately with a ready-up timer, and downed players are revived by a teammate standing near them.
-- **Netcode:**
-  - **Server-authoritative.** The Node server runs `@game/sim` at a 20–30 Hz tick, and clients send input commands.
-  - The server broadcasts **binary snapshots** with quantized positions and deltas (msgpack parser), plus sim events.
-  - Clients **predict their own player** and interpolate everyone else about 100 ms behind.
-  - Projectiles are sent as spawn events and simulated client-side to save bandwidth.
-- **Why not lockstep?** It would be cheaper for bandwidth, but cross-browser floating-point/trig desyncs make it fragile.
-- **Rooms:** 6-character room codes first, quick-match later.
-- **Auth:** the socket handshake carries the player's token (provider TBD, §8), which the server verifies.
-- **Hosting:** the client is static on Cloudflare Pages/Vercel/Netlify; the socket server runs on **Fly.io** or Railway.
-- **What we do now to keep this cheap:** the sim never touches the DOM or the clock, input is commands, and entities have stable IDs.
+Up to 4 friends in one run, joined by a shared link. Pulled forward ahead of Phase 4.
 
----
+**Decided (2026-10-29):** the socket server is hosted on Railway; revive by standing next to a teammate for 3 s, and anyone still down returns next wave; co-op hiscores per party size; lockstep input relay, provided 5a shows every browser computes identically.
+
+### How it plays
+- **Starting a game:** "Play with friends" on the title screen opens a lobby with an invite link (`…/?room=K7QX2M`, 6 characters with no lookalikes like 0/O or 1/I). Phones get the share sheet; desktop gets Copy link.
+- **Joining:** opening the link goes straight to that lobby. You type a name (remembered from hiscores), pick a starting weapon and press Ready. The host starts when everyone is ready. The host can also start with fewer than 4 players.
+- **In the run:** one shared arena. Each Bob gets a colour (outline and name tag), the HUD shows teammates' HP, and arrows at the screen edge point to teammates who are off screen. Your camera follows you.
+- **Between waves:** everyone levels up and shops on their own, as in solo. A strip shows who you're waiting for, and a 45 s timer readies anyone still shopping.
+- **Going down:** at 0 HP you're down, not dead. A teammate who stands next to you for 3 s revives you at 50% HP. Anyone still down comes back at the start of the next wave with 50% HP. The run is lost only when everyone is down at the same time.
+- **No pause in co-op.** Esc opens the menu, but the game keeps going. The menu has a Leave button.
+- **The end:** team score plus each player's kills and damage. "Play again" returns the same group to the lobby.
+- **Co-op hiscores:** separate weekly and all-time boards per party size (Duo, Trio, Squad), with the team's names on each entry.
+
+### Fairness: monsters scale with the party
+Each player brings their own weapons, so the horde has to grow. These are starting numbers, tuned with bot parties:
+
+| Players | Spawn rate | Enemy HP | Elite HP | Enemy cap |
+|---|---|---|---|---|
+| 1 | ×1 | ×1 | ×1 | 300 |
+| 2 | ×1.6 | ×1.15 | ×1.8 | 340 |
+| 3 | ×2.2 | ×1.3 | ×2.6 | 380 |
+| 4 | ×2.8 | ×1.45 | ×3.4 | 420 |
+
+- Damage per hit doesn't change: each player faces the same danger per contact, just more of it at once.
+- Coins and XP work as they do now. Each coin goes to whoever picks it up, and loose coins at wave end are split evenly (the sim already does this). More monsters means roughly the same coins per player.
+- **Tuning:** the headless bot plays 1-, 2-, 3- and 4-player runs on 100 seeds each. The factors are adjusted until bot parties win about as often, and lose about as much HP, as a solo bot. All factors live in `packages/content` (`COOP_SCALING`).
+- The enemy cap rises a little with the party but stays bounded for phones. It's checked on a mid-range Android in 5b.
+
+### Netcode: lockstep, with the server as referee
+This replaces the earlier snapshot plan. That plan rejected lockstep because cross-browser float differences could desync clients. Since then the sim has proven deterministic: every posted hiscore is re-simulated in Node and matches the browser exactly. 5a extends that proof to Firefox and Safari before anything else is built.
+
+1. **The server is the clock.** It counts frames at 60 per second. Every 50 ms (3 frames) it sends all players a bundle: each player's movement for those frames (2 bytes each) and any level-up or shop choices. That's about 20 messages a second of a few dozen bytes, around 1 kB/s per player.
+2. **Clients send input when it changes.** For each frame the server uses each player's latest input. Missing input repeats the last one, and after 2 s of silence that player's Bob stands still.
+3. **Every client runs the same sim on the same bundles,** so all worlds stay identical. Sounds and effects come from each client's own sim, exactly as in solo. No positions are ever streamed.
+4. **The server also runs the sim.** It costs about 0.5 ms a frame, so one small server handles dozens of rooms. Because of it, the server knows when waves end and readies stragglers. It also computes the team's score for the hiscores itself, so co-op runs need no replay upload.
+5. **Desync guard.** Each client sends a hash of its world every second. If one differs from the server's, that client rebuilds by re-simulating the room's input log from the start, which takes about a second for a full run.
+6. **Reconnects and backgrounded tabs** use the same fast-forward from the input log. Players can rejoin the same run within 2 minutes.
+7. **Trade-off: input latency.** Your own Bob responds one round trip after you press, around 50–150 ms on normal connections. That's fine for an auto-attack game, but noticeable on bad 4G. If playtests say it hurts, 5f adds **rollback**: your Bob moves instantly, and the sim rewinds a few frames whenever teammates' inputs arrive.
+
+- **Fallback if 5a fails:** the server runs the sim and streams binary snapshots, and clients interpolate everyone and predict their own Bob. It's robust to determinism bugs, but uses 10–50× the bandwidth, needs server-sent events for every sound and effect, and is a lot more client code.
+
+### Server (`apps/server`)
+- **Stack:** Node with socket.io 4.8, importing `@game/sim` and `@game/content` like the hiscores API does.
+- **Rooms, in memory:** code, host, up to 4 players (id, name, weapon, colour, ready, connected), the input log and the sim world.
+- **Messages:** `room:create`, `room:join`, `lobby` (state), `ready`, `start` (seed and players), `input`, `action`, `frames` (the bundles), `hash`, `resync`, `over`.
+- **Limits:**
+  - 4 players per room.
+  - A room closes 10 minutes after it's empty.
+  - Messages are rate-limited per socket.
+  - Names follow the same rules as the hiscores.
+  - Connections are accepted only from the game's own domains.
+- **Hosting: Railway** (about $5/month). Vercel can't hold open connections, so only the socket server lives there. Players never see its address: the game, invite links and hiscores stay on the Vercel site, and the client connects to Railway by itself.
+- The client finds the server through `VITE_COOP_URL`. Co-op hiscores are written to the same Upstash database (prefix `bob:`), with the REST token stored as a server secret.
+
+### Changes by package
+- **Sim:**
+  - party scaling in the spawner and `spawnEnemy`;
+  - a `downed` state with revive progress, and `startWave` bringing back players who are down;
+  - a frame-based co-op replay (every player's input per frame, plus actions);
+  - a cheap world hash.
+- **Client:**
+  - the lobby, invite links and share sheet;
+  - a `NetSession` that feeds `step()` from server bundles instead of the local clock;
+  - player colours, name tags, teammate HP, off-screen arrows, and a spectator camera while you're down;
+  - the ready strip and timer, co-op results;
+  - a ping indicator, "Reconnecting…", and host hand-over when the host leaves.
+- **Content:** `COOP_SCALING`.
+- **API:** co-op boards, written by the game server.
 
 ## 10. Phases
 
@@ -402,10 +458,14 @@ Skins unlock from achievements:
 - Headless **bot-run balancing**: run thousands of simulated waves overnight and export the stats.
 - **Done when:** a full 20-wave run is balanced across difficulties, with 2 zones.
 
-### Phase 5: Co-op multiplayer (large)
-- `apps/server` with socket.io, rooms and codes, server-authoritative sim, snapshot interpolation + own-player prediction, reconnect, co-op hiscores.
-- Deploy to Fly.io.
-- **Done when:** 2–4 phones play a smooth co-op run over 4G.
+### Phase 5: Co-op multiplayer (large; pulled ahead of Phase 4, plan in §9)
+- **5a Determinism check (small).** Play one recorded run in Chrome, Firefox, Safari on iOS and Chrome on Android, and compare world hashes every second. Identical everywhere means go with lockstep; otherwise switch to the snapshot fallback before building more.
+- **5b Party sim (small–medium).** Party scaling, down and revive, co-op replays and the world hash. Bot parties of 1–4 tune `COOP_SCALING`, and a 4-player wave 10 is measured on a mid-range phone.
+- **5c Server and lobby (medium).** `apps/server`, rooms, invite links, the lobby, and lockstep play between two browsers locally, then deployed to the chosen host.
+- **5d Co-op feel (medium).** Colours, name tags, teammate HP, off-screen arrows, the spectator camera, the ready timer, reconnect fast-forward, Leave and host hand-over.
+- **5e Co-op hiscores (small).** Duo, Trio and Squad boards, weekly and all time.
+- **5f Rollback (medium, only if needed).** Instant local movement if the input delay feels bad over 4G.
+- **Done when:** four phones on different networks (one on 4G) finish a run together with no desyncs, and it takes under 30 s from tapping an invite link to the first wave.
 
 ### Phase 6: Creative extras (ongoing)
 - Strudel-composed soundtrack (bounced loops or live, see §7).
@@ -448,4 +508,6 @@ Skins unlock from achievements:
 | **Strudel AGPL** | Bounce Strudel compositions to audio files (§7) |
 | **Score cheating** | **Done:** the server picks the seed, replays every posted run and records its own score (§8). Bots that play in real time remain possible |
 | **iOS Safari audio quirks** | Gesture unlock, audioSession, resume on visibility change |
+| **Co-op desyncs** (lockstep needs every browser to compute identically) | The sim already avoids engine-dependent float math, and solo replays already match Node exactly. 5a proves it across browsers first; the desync guard rebuilds a client from the input log; snapshots are the fallback |
+| **Co-op input delay** on slow connections | Measured in 5c playtests; rollback (5f) if it hurts |
 | **Low-end Android performance** | Atlas + ParticleContainer + spatial hash + entity caps + auto quality scaling |

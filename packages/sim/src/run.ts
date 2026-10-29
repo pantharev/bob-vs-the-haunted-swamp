@@ -20,6 +20,8 @@ export interface WorldOptions {
   character?: CharacterDef;
   /** Starting weapons. Default: one scimitar. */
   weapons?: readonly WeaponId[];
+  /** Co-op: each player's own starting weapons. Overrides `playerCount` and `weapons`. */
+  loadouts?: readonly (readonly WeaponId[])[];
   /** Debug: begin at this wave (1-based). */
   startWave?: number;
 }
@@ -30,10 +32,11 @@ export function createWorld({
   playerCount = 1,
   character = BOB,
   weapons = ['scimitar'],
+  loadouts = Array.from({ length: playerCount }, () => weapons),
   startWave: firstWave = 1,
 }: WorldOptions): World {
-  const players = Array.from({ length: playerCount }, (_, id) => {
-    const p = createPlayer(id, character, weapons);
+  const players = loadouts.map((kit, id) => {
+    const p = createPlayer(id, character, kit);
     recomputeStats(p);
     return p;
   });

@@ -11,6 +11,12 @@ import './style.css';
 import './ui/ui.css';
 
 async function boot(): Promise<void> {
+  // ?sync: the co-op determinism self-test (PLAN.md §9, 5a) instead of the game.
+  if (new URLSearchParams(location.search).has('sync')) {
+    const { runSyncCheck } = await import('./selftest/sync');
+    await runSyncCheck(document.body);
+    return;
+  }
   const app = new Application();
   await app.init({
     resizeTo: window,

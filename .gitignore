@@ -13,3 +13,6 @@ generated-images/
 # Vercel build output and local env (Upstash credentials)
 .vercel/
 .env*.local
+
+# Rendered trailers and other big media (kept out of git)
+marketing/*.mp4
