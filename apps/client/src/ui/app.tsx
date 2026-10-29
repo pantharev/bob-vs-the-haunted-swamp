@@ -2,6 +2,7 @@ import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { Game } from '../game';
 import { typingIn } from '../input/keyboard';
+import { CoopScreen, WaitingScreen } from './coop';
 import { LevelUpScreen } from './level-up';
 import { PauseScreen } from './pause';
 import { ResultsScreen } from './results';
@@ -26,10 +27,16 @@ function App({ game }: { game: Game }) {
     return unsubscribe;
   }, [game]);
 
-  if (game.screen === 'title') return <TitleScreen game={game} />;
+  if (game.screen === 'title') {
+    return game.coopEntry || game.coop?.lobby ? (
+      <CoopScreen game={game} />
+    ) : (
+      <TitleScreen game={game} />
+    );
+  }
 
   const { world } = game;
-  const player = world.players[0];
+  const player = world.players[game.localPlayer];
   if (!player) return null;
 
   switch (world.phase) {
@@ -45,6 +52,8 @@ function App({ game }: { game: Game }) {
         </button>
       );
     case 'intermission':
+      // Co-op: done shopping, waiting on the others.
+      if (game.isCoop && player.intermission === 'ready') return <WaitingScreen game={game} />;
       return player.intermission === 'levelUp' ? (
         <LevelUpScreen game={game} player={player} />
       ) : (
@@ -64,7 +73,8 @@ export function useHotkeys(handler: (code: string) => boolean | void, deps: unkn
     const listener = (e: KeyboardEvent) => {
       if (e.repeat || typingIn(e)) return;
       const focused = document.activeElement;
-      if ((e.code === 'Enter' || e.code === 'Space') && focused && focused !== document.body) return;
+      if ((e.code === 'Enter' || e.code === 'Space') && focused && focused !== document.body)
+        return;
       if (handler(e.code)) e.preventDefault();
     };
     window.addEventListener('keydown', listener, { capture: true });

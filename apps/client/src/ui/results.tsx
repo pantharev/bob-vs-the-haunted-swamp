@@ -13,7 +13,9 @@ export function ResultsScreen({ game, player }: { game: Game; player: Player }) 
   const { stats } = world;
   const won = world.outcome === 'victory';
   const [page, open] = useInfoPage(game);
-  const again = () => game.startRun({ weapon: game.lastWeapon });
+  const coop = game.isCoop;
+  // Co-op goes back to the room's lobby, where the host starts the next run.
+  const again = () => (coop ? game.backToLobby() : game.startRun({ weapon: game.lastWeapon }));
   useHotkeys(
     (code) => {
       if (!page && code === 'Enter') {
@@ -29,7 +31,15 @@ export function ResultsScreen({ game, player }: { game: Game; player: Player }) 
   return (
     <div class="screen enter slow">
       <div class="panel narrow">
-        <h1 class={won ? 'win' : 'lose'}>{won ? 'Bob survived!' : 'Bob has fallen'}</h1>
+        <h1 class={won ? 'win' : 'lose'}>
+          {coop
+            ? won
+              ? 'The party survived!'
+              : 'The party has fallen'
+            : won
+              ? 'Bob survived!'
+              : 'Bob has fallen'}
+        </h1>
         <p class="sub">
           {won
             ? `All ${world.waves.length} waves cleared.`
@@ -43,7 +53,7 @@ export function ResultsScreen({ game, player }: { game: Game; player: Player }) 
           Kills {formatScore(stats.killPoints)} · Wave bonus {formatScore(stats.waveBonus)}
           {won && ` · Victory ${formatScore(stats.victoryBonus)}`}
         </p>
-        <PostScore game={game} />
+        {coop ? <p class="hint">Co-op hiscores are coming soon.</p> : <PostScore game={game} />}
         <dl class="summary">
           <dt>Kills</dt>
           <dd>{stats.kills}</dd>
@@ -66,9 +76,9 @@ export function ResultsScreen({ game, player }: { game: Game; player: Player }) 
         </dl>
         <div class="actions">
           <button class="primary big" onClick={again}>
-            Play again
+            {coop ? 'Back to lobby' : 'Play again'}
           </button>
-          <button onClick={() => game.quitToTitle()}>Change weapon</button>
+          <button onClick={() => game.quitToTitle()}>{coop ? 'Leave' : 'Change weapon'}</button>
           <button onClick={() => open('hiscores')}>Hiscores</button>
         </div>
       </div>

@@ -9,13 +9,14 @@ export function PauseScreen({ game }: { game: Game }) {
   return (
     <div class="screen">
       <div class="panel narrow">
-        <h1>Paused</h1>
+        <h1>{game.isCoop ? 'Menu' : 'Paused'}</h1>
         <p class="sub">
           Wave {game.world.wave} of {game.world.waves.length}
+          {game.isCoop && ' · the game keeps going while this is open'}
         </p>
         <div class="actions column">
           <button class="primary big" onClick={() => game.setPaused(false)}>
-            Resume
+            {game.isCoop ? 'Back to the game' : 'Resume'}
           </button>
           <div class="row">
             <SoundToggles game={game} />
@@ -23,7 +24,9 @@ export function PauseScreen({ game }: { game: Game }) {
           <div class="row">
             <InfoButtons onOpen={open} />
           </div>
-          <button onClick={() => game.quitToTitle()}>Quit run</button>
+          <button onClick={() => game.quitToTitle()}>
+            {game.isCoop ? 'Leave game' : 'Quit run'}
+          </button>
         </div>
       </div>
     </div>

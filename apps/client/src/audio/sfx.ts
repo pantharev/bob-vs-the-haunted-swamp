@@ -72,8 +72,8 @@ export class Sfx {
     this.warm([...SFX_IDS]);
   }
 
-  /** `listenerX` is Bob's position, for panning. */
-  handle(events: readonly SimEvent[], listenerX: number): void {
+  /** `listenerX` is your Bob's position, for panning; `me` is your player, whose own hits and pickups you hear. */
+  handle(events: readonly SimEvent[], listenerX: number, me = 0): void {
     if (this.ctx.state !== 'running') return;
     const runOver = events.some((ev) => ev.type === 'runOver');
     for (const ev of events) {
@@ -107,6 +107,7 @@ export class Sfx {
           this.play('lunge');
           break;
         case 'playerHit':
+          if (ev.player !== me) break;
           if (ev.dodged) {
             this.play('dodge');
           } else {
@@ -117,12 +118,16 @@ export class Sfx {
         case 'playerDeath':
           this.play('death');
           break;
+        case 'playerRevive':
+          this.play('levelUp');
+          break;
         case 'pickup':
+          if (ev.player !== me) break;
           if (ev.kind === 'food') this.play('food');
           else this.coin(ev.value > 1);
           break;
         case 'levelUp':
-          this.play('levelUp');
+          if (ev.player === me) this.play('levelUp');
           break;
         case 'waveStart':
           this.play('waveStart');

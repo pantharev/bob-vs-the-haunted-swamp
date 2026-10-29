@@ -1,5 +1,6 @@
 import { WEAPON_IDS, WEAPONS, ZONES, type WeaponId } from '@game/content';
 import { useState } from 'preact/hooks';
+import { Coop } from '../coop/coop';
 import type { Game } from '../game';
 import { CREATOR, VERSION } from './about';
 import { useHotkeys } from './app';
@@ -63,6 +64,14 @@ export function TitleScreen({ game }: { game: Game }) {
           <button class="primary big" onClick={start}>
             Start
           </button>
+          {Coop.available && (
+            <button
+              class="big"
+              onClick={() => (game.audio.ui('click'), game.openCoop({ mode: 'create' }))}
+            >
+              Play with friends
+            </button>
+          )}
         </div>
         <div class="actions">
           <button class="small" onClick={() => open('hiscores')}>

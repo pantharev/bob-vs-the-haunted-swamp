@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Shared by the browser and the Node server: no DOM, no Node.
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src"]
+}

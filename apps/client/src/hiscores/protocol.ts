@@ -69,7 +69,6 @@ export interface ApiError {
   readonly error: string;
 }
 
-export const NAME_MAX = 16;
-/** Letters, digits, spaces, hyphens and underscores; no leading, trailing or double spaces. */
-export const NAME_PATTERN = /^[\p{L}\p{N}_-]+( [\p{L}\p{N}_-]+)*$/u;
+// Name rules are shared with the co-op lobby.
+export { NAME_MAX, NAME_PATTERN } from '@game/coop';
 export const PLAYER_ID_PATTERN = /^[0-9a-f]{32}$/;

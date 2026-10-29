@@ -22,6 +22,7 @@ export const CHANGELOG: readonly Release[] = [
       'Downed, not dead: stand next to a fallen teammate for 3 seconds to revive them at half HP. Anyone still down at the end of a wave is back for the shop and starts the next wave at half HP.',
       'Try it early with bot teammates: add ?bots=3 to the address. Those runs don’t go on the hiscores.',
       'Behind the scenes: proved every browser (Chrome, Firefox, Safari’s engine, Android) runs the game exactly the same, which co-op relies on.',
+      'The co-op lobby is built: create a game, send the invite link, everyone picks a weapon and readies up, and the whole party plays the same run. A reload drops you straight back in. It switches on here as soon as the co-op server is online.',
     ],
   },
   {

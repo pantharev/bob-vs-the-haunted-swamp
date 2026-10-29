@@ -1,8 +1,7 @@
 import { ZONES, type ZoneDef } from '@game/content';
+import { cleanName, NAME_MAX } from '@game/coop';
 import { ReplayError, replayRun, TICK_RATE, type Replay, type World } from '@game/sim';
 import {
-  NAME_MAX,
-  NAME_PATTERN,
   PLAYER_ID_PATTERN,
   type BoardId,
   type BoardResponse,
@@ -189,13 +188,6 @@ export function createApi({
     const minute = Math.floor(now() / 60_000);
     return (await store.count(`${PREFIX}:rate:${kind}:${ip}:${minute}`, 120)) > LIMITS[kind];
   }
-}
-
-/** Trims and squeezes spaces; null if the name isn't allowed. */
-export function cleanName(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const name = raw.trim().replace(/\s+/g, ' ');
-  return [...name].length <= NAME_MAX && NAME_PATTERN.test(name) ? name : null;
 }
 
 /** ISO 8601 week of a UTC time, like "2026-W44". Weeks start on Monday. */

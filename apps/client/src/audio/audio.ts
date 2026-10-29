@@ -39,9 +39,9 @@ export class GameAudio {
     document.addEventListener('visibilitychange', () => this.syncRunning());
   }
 
-  /** `listenerX` is Bob's position, for panning. */
-  handle(events: readonly SimEvent[], listenerX: number): void {
-    this.sfx?.handle(events, listenerX);
+  /** `listenerX` is your Bob's position, for panning; `me` is your player. */
+  handle(events: readonly SimEvent[], listenerX: number, me = 0): void {
+    this.sfx?.handle(events, listenerX, me);
   }
 
   /** Menu feedback: clicks, purchases, refusals, upgrade picks. */

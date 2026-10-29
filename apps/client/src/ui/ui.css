@@ -667,3 +667,115 @@ table.hiscores {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------- co-op */
+
+.coop .field {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  text-align: left;
+}
+
+.coop .field span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.coop input[type='text'] {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 2px solid var(--edge-hi);
+  border-radius: 8px;
+  background: #0f0c08;
+  color: var(--ink);
+  /* 16px or more, or iOS zooms the page when the field takes focus. */
+  font: 16px var(--body);
+}
+
+.coop input[type='text']:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.invite {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.invite input[type='text'] {
+  flex: 1;
+  font-size: 14px;
+  color: var(--gold);
+}
+
+.party {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.party li {
+  display: grid;
+  grid-template-columns: 14px 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgb(77 60 38 / 0.45);
+}
+
+.party li.you {
+  background: rgb(242 193 78 / 0.08);
+}
+
+.party li.empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.party .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 0.5);
+}
+
+.party li.empty .dot {
+  opacity: 0.35;
+}
+
+.party small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.party small.host {
+  color: var(--gold);
+}
+
+.party .state {
+  min-width: 52px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: right;
+}
+
+.party .state.ready {
+  color: var(--good);
+  font-weight: bold;
+}
+
+.weapon-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.weapon-picks button.selected {
+  border-color: var(--gold);
+  color: var(--gold);
+}

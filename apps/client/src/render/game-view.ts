@@ -34,6 +34,8 @@ export class GameView {
   readonly camera = new Camera();
   /** Off on the title screen, where the backdrop world isn't a real run. */
   hudVisible = true;
+  /** The player the camera follows and the HUD describes: you. */
+  focus = 0;
   private readonly worldLayer = new Container();
   private readonly groundFx = new Container();
   private readonly entityLayer = new Container({ sortableChildren: true });
@@ -77,7 +79,10 @@ export class GameView {
     this.arena = createArenaView(world.arena, world.seed);
     this.worldLayer.addChildAt(this.arena, 0);
     this.atmosphere = new Atmosphere(world.seed);
-    this.app.stage.addChildAt(this.atmosphere.root, this.app.stage.getChildIndex(this.worldLayer) + 1);
+    this.app.stage.addChildAt(
+      this.atmosphere.root,
+      this.app.stage.getChildIndex(this.worldLayer) + 1,
+    );
 
     for (const view of this.players) view.root.destroy({ children: true });
     this.players = world.players.map((p) => {
@@ -88,7 +93,7 @@ export class GameView {
     for (const view of this.enemyViews.values()) this.releaseEnemy(view);
     this.enemyViews.clear();
 
-    const focus = world.players[0];
+    const focus = world.players[this.focus];
     if (focus) this.camera.snapTo(focus.x, focus.y);
   }
 
@@ -124,17 +129,27 @@ export class GameView {
           this.fx.hitsplat(p.x, p.y - CHEST_HEIGHT - 12, ev.amount, ev.dodged ? 'miss' : 'damage');
           if (!ev.dodged) {
             this.players[ev.player]?.hurt();
-            this.camera.shake(0.28 + Math.min(0.3, ev.amount / p.maxHp));
+            // Only your own hits shake your screen.
+            if (ev.player === this.focus)
+              this.camera.shake(0.28 + Math.min(0.3, ev.amount / p.maxHp));
           }
           break;
         }
         case 'playerDeath':
-          this.camera.shake(0.7);
+          if (ev.player === this.focus) this.camera.shake(0.7);
           break;
         case 'attack': {
           const def = WEAPONS[ev.weapon];
           if (def.pattern === 'arc') {
-            this.fx.slash(ev.x, ev.y, ev.dirX, ev.dirY, def.range, ev.weapon === 'dagger', SLASH_TINT[ev.weapon] ?? 0xffffff);
+            this.fx.slash(
+              ev.x,
+              ev.y,
+              ev.dirX,
+              ev.dirY,
+              def.range,
+              ev.weapon === 'dagger',
+              SLASH_TINT[ev.weapon] ?? 0xffffff,
+            );
           }
           break;
         }
@@ -144,7 +159,15 @@ export class GameView {
           break;
         case 'pickup': {
           const p = world.players[ev.player];
-          if (p) this.fx.burst(p.x, p.y - 20, ev.kind === 'coin' ? 0xffd75a : 0x7be36a, ev.kind === 'coin' ? 2 : 10, 70, 0.7);
+          if (p)
+            this.fx.burst(
+              p.x,
+              p.y - 20,
+              ev.kind === 'coin' ? 0xffd75a : 0x7be36a,
+              ev.kind === 'coin' ? 2 : 10,
+              70,
+              0.7,
+            );
           break;
         }
         case 'levelUp': {
@@ -171,7 +194,7 @@ export class GameView {
     this.syncProjectiles(world, alpha);
     this.fx.update(dt);
 
-    const focus = world.players[0];
+    const focus = world.players[this.focus];
     if (!focus) return;
     const fx = focus.prevX + (focus.x - focus.prevX) * alpha;
     const fy = focus.prevY + (focus.y - focus.prevY) * alpha;
@@ -241,7 +264,12 @@ export class GameView {
   }
 
   private syncMarkers(world: World): void {
-    const sprites = this.pool(this.markerSprites, world.markers.length, this.art.marker, this.groundFx);
+    const sprites = this.pool(
+      this.markerSprites,
+      world.markers.length,
+      this.art.marker,
+      this.groundFx,
+    );
     world.markers.forEach((m, i) => {
       const s = sprites[i]!;
       const pulse = 0.5 + 0.5 * Math.sin(this.time * 14 + m.id);
@@ -252,7 +280,12 @@ export class GameView {
   }
 
   private syncPickups(world: World, alpha: number): void {
-    const sprites = this.pool(this.pickupSprites, world.pickups.length, this.art.coin, this.groundFx);
+    const sprites = this.pool(
+      this.pickupSprites,
+      world.pickups.length,
+      this.art.coin,
+      this.groundFx,
+    );
     world.pickups.forEach((pk, i) => {
       const s = sprites[i]!;
       s.texture = pk.kind === 'coin' ? this.art.coin : this.art.food;
@@ -265,7 +298,12 @@ export class GameView {
   }
 
   private syncProjectiles(world: World, alpha: number): void {
-    const sprites = this.pool(this.projectileSprites, world.projectiles.length, this.art.dot, this.airLayer);
+    const sprites = this.pool(
+      this.projectileSprites,
+      world.projectiles.length,
+      this.art.dot,
+      this.airLayer,
+    );
     world.projectiles.forEach((pr, i) => {
       const s = sprites[i]!;
       s.texture = this.art.projectiles[pr.weapon] ?? this.art.dot;
@@ -288,7 +326,13 @@ export class GameView {
   }
 
   /** Grows a sprite pool to `count`, shows the first `count` and hides the rest. */
-  private pool(sprites: Sprite[], count: number, texture: Texture, parent: Container, at?: number): Sprite[] {
+  private pool(
+    sprites: Sprite[],
+    count: number,
+    texture: Texture,
+    parent: Container,
+    at?: number,
+  ): Sprite[] {
     while (sprites.length < count) {
       const s = new Sprite(texture);
       s.anchor.set(0.5);

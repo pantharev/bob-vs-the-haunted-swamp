@@ -1,5 +1,14 @@
 import { MAX_PARTY, WEAPON_IDS, ZONES, type WeaponId, type ZoneDef } from '@game/content';
 import {
+  applyFrame,
+  hashDue,
+  SHOP_FRAMES,
+  startWorld,
+  toSteps,
+  type Frame,
+  type RunStart,
+} from '@game/coop';
+import {
   applyAction,
   createWorld,
   DT,
@@ -8,12 +17,15 @@ import {
   step,
   type InputCommand,
   type RunAction,
+  type SimEvent,
   type World,
+  worldHash,
 } from '@game/sim';
 import type { Application } from 'pixi.js';
 import type { GameAudio } from './audio/audio';
 import type { MusicScene } from './audio/music';
 import type { UiSound } from './audio/sfx-bank';
+import { Coop } from './coop/coop';
 import type { DebugOverlay } from './debug/overlay';
 import { HiscoreError, Hiscores } from './hiscores/client';
 import type { SubmitResponse } from './hiscores/protocol';
@@ -49,6 +61,23 @@ export interface BotBrain {
   botIntermission(world: World, index: number): void;
 }
 
+/** What the title screen shows for co-op before you're in a room. */
+export type CoopEntry =
+  { readonly mode: 'create' } | { readonly mode: 'join'; readonly code: string };
+
+/** A co-op run in progress: frames from the server waiting to be played, and how many were. */
+interface NetRun {
+  readonly queue: Frame[];
+  applied: number;
+  /** Frame the current intermission opened at, for the shop timer. */
+  intermissionSince: number | null;
+}
+
+/** Frames kept in hand against network jitter; more than this means we're behind and catch up. */
+const NET_BUFFER = 6;
+/** Most frames played in one render frame while catching up (after a hidden tab, say). */
+const NET_CATCH_UP = 120;
+
 /** A run that can go on the hiscores: its ticket, and the replay being recorded. */
 interface RankedRun {
   readonly ticket: string;
@@ -66,7 +95,15 @@ export class Game {
   world: World;
   lastWeapon: WeaponId = 'scimitar';
   readonly hiscores = new Hiscores();
+  /** Co-op, once opened from the title screen or an invite link. */
+  coop: Coop | null = null;
+  coopEntry: CoopEntry | null = null;
+  /** Which of the world's players is you: 0 except in co-op. */
+  localPlayer = 0;
+  /** Co-op: each player's name, in player order. */
+  coopNames: readonly string[] = [];
   private ranked: RankedRun | null = null;
+  private net: NetRun | null = null;
   private bots: { readonly count: number; readonly brain: BotBrain } | null = null;
   private accumulator = 0;
   private readonly listeners = new Set<() => void>();
@@ -99,6 +136,87 @@ export class Game {
     return this.screen === 'run' && this.world.phase === 'wave';
   }
 
+  /** In a co-op run (or its results). */
+  get isCoop(): boolean {
+    return this.net !== null;
+  }
+
+  /** Shows co-op on the title screen: creating a game, or joining one from an invite link. */
+  openCoop(entry: CoopEntry): void {
+    this.coop ??= new Coop(this);
+    this.coopEntry = entry;
+    this.notify();
+  }
+
+  /** Back from the co-op screens to the normal title (not in a room). */
+  closeCoop(): void {
+    this.coopEntry = null;
+    this.audio.ui('click');
+    this.notify();
+  }
+
+  /** The server started (or rebuilt) a run: play it from its frames as player `me`. */
+  startCoop(start: RunStart, me: number): void {
+    const fresh = start.frames.length === 0;
+    this.ranked = null;
+    this.localPlayer = me;
+    this.coopNames = start.roster.map((r) => r.name);
+    this.world = startWorld(start);
+    this.net = { queue: [], applied: 0, intermissionSince: null };
+    // A rejoin or resync catches up silently on the frames already played.
+    for (const frame of start.frames) this.playFrame(frame, false);
+    this.view.focus = me;
+    this.view.setWorld(this.world);
+    this.view.hudVisible = true;
+    this.screen = 'run';
+    this.paused = false;
+    this.accumulator = 0;
+    this.input.reset();
+    if (fresh) this.audio.ui('start');
+    this.notify();
+  }
+
+  /** Frames from the server, in order. */
+  pushFrames(from: number, frames: readonly Frame[]): void {
+    const net = this.net;
+    if (!net) return;
+    const expected = net.applied + net.queue.length;
+    // Anything before `expected` we already have (it came with a resync).
+    if (from + frames.length <= expected || from > expected) return;
+    net.queue.push(...frames.slice(expected - from));
+  }
+
+  /** Seconds left before the server readies anyone still shopping, in co-op. */
+  get shopSecondsLeft(): number | null {
+    const net = this.net;
+    if (!net || net.intermissionSince === null) return null;
+    return Math.max(0, Math.ceil((net.intermissionSince + SHOP_FRAMES - net.applied) / 60));
+  }
+
+  /** From co-op results back to the room's lobby. */
+  backToLobby(): void {
+    this.endCoopRun();
+    this.audio.ui('click');
+    this.notify();
+  }
+
+  /** Left the room (or it closed): back to the plain title screen. */
+  leaveCoop(): void {
+    this.endCoopRun();
+    this.coopEntry = null;
+    this.notify();
+  }
+
+  private endCoopRun(): void {
+    this.net = null;
+    this.coopNames = [];
+    this.localPlayer = 0;
+    this.view.focus = 0;
+    this.world = this.backdrop();
+    this.screen = 'title';
+    this.paused = false;
+  }
+
   /** Every following run gets `count` bot teammates. Such runs aren't ranked. */
   useBots(count: number, brain: BotBrain): void {
     this.bots = { count: Math.max(0, Math.min(count, MAX_PARTY - 1)), brain };
@@ -106,6 +224,9 @@ export class Game {
 
   startRun({ weapon, seed, wave }: RunOptions): void {
     this.lastWeapon = weapon;
+    this.net = null;
+    this.localPlayer = 0;
+    this.view.focus = 0;
     const bots = this.bots?.count ?? 0;
     // Only a normal solo start can be ranked: the server picks the seed and the run starts at wave 1.
     const ticket =
@@ -135,6 +256,11 @@ export class Game {
   }
 
   quitToTitle(): void {
+    if (this.coop?.lobby) {
+      this.audio.ui('click');
+      this.coop.leave();
+      return;
+    }
     this.audio.ui('click');
     this.world = this.backdrop();
     this.screen = 'title';
@@ -190,7 +316,13 @@ export class Game {
   /** A between-wave choice from the UI. Returns false if the sim refused it. */
   act(action: RunAction): boolean {
     const sound = this.actionSound(action);
-    const ok = applyAction(this.world, 0, action);
+    if (this.net) {
+      // Co-op: the server applies it, and it comes back in a frame for everyone.
+      this.coop?.sendAction(action);
+      this.audio.ui(sound);
+      return true;
+    }
+    const ok = applyAction(this.world, this.localPlayer, action);
     if (ok) this.ranked?.recorder.action(action);
     this.audio.ui(ok ? sound : 'error');
     this.consume();
@@ -206,6 +338,13 @@ export class Game {
     const frameSeconds = Math.min(deltaMS / 1000, MAX_FRAME_SECONDS);
     const world = this.world;
     this.botsShop(world);
+    if (this.net) {
+      this.netFrame(frameSeconds);
+      this.view.render(Math.min(1, this.accumulator / DT), frameSeconds, this.input);
+      this.audio.update(this.musicScene(), this.musicIntensity(), false);
+      this.debugLines(world, fps);
+      return;
+    }
     const running = this.inWave && !this.paused;
 
     if (running) {
@@ -234,9 +373,55 @@ export class Game {
 
     this.view.render(running ? this.accumulator / DT : 1, frameSeconds, this.input);
     this.audio.update(this.musicScene(), this.musicIntensity(), this.paused);
+    this.debugLines(world, fps);
+  }
 
+  /**
+   * Co-op: plays the server's frames at 60 a second, keeping a few in hand
+   * against jitter and catching up when behind. Sends your input as it goes.
+   */
+  private netFrame(frameSeconds: number): void {
+    const net = this.net!;
+    const [x, y] = this.paused ? [0, 0] : toSteps(this.input.sample());
+    this.coop?.sendInput(x, y, performance.now());
+
+    const simStart = performance.now();
+    this.accumulator += frameSeconds;
+    const extra = Math.max(0, net.queue.length - NET_BUFFER);
+    let steps = 0;
+    while (
+      net.queue.length > 0 &&
+      steps < NET_CATCH_UP &&
+      (this.accumulator >= DT || steps < extra)
+    ) {
+      this.playFrame(net.queue.shift()!, true);
+      if (this.accumulator >= DT) this.accumulator -= DT;
+      steps++;
+    }
+    // Out of frames: wait for the next bundle instead of running up a debt.
+    if (net.queue.length === 0) this.accumulator = Math.min(this.accumulator, DT);
+    this.debug.recordSim(performance.now() - simStart, steps);
+  }
+
+  /** Applies one server frame; `live` frames also drive the view, sound and hash reports. */
+  private playFrame(frame: Frame, live: boolean): void {
+    const net = this.net!;
+    const world = this.world;
+    const phase = world.phase;
+    applyFrame(world, frame, live ? (events) => this.consume(events) : undefined);
+    const index = net.applied++;
+    if (live && hashDue(index)) this.coop?.sendHash(index, worldHash(world));
+    if (world.phase === 'intermission') net.intermissionSince ??= index;
+    else net.intermissionSince = null;
+    if (live && (world.phase !== phase || frame.a)) {
+      this.input.reset();
+      this.notify();
+    }
+  }
+
+  private debugLines(world: World, fps: number): void {
     this.debug.update(performance.now(), () => {
-      const p = world.players[0];
+      const p = world.players[this.localPlayer];
       const { width, height } = this.app.screen;
       return [
         `fps ${fps.toFixed(0)}  tick ${world.tick}  seed ${world.seed}`,
@@ -248,6 +433,8 @@ export class Game {
   }
 
   private musicScene(): MusicScene {
+    // The co-op lobby gets the shop's music box.
+    if (this.screen === 'title' && this.coop?.lobby) return 'shop';
     if (this.screen === 'title') return 'title';
     switch (this.world.phase) {
       case 'wave':
@@ -275,7 +462,7 @@ export class Game {
 
   /** Read before the action applies: the pick's rarity, the lock's state. */
   private actionSound(action: RunAction): UiSound {
-    const p = this.world.players[0];
+    const p = this.world.players[this.localPlayer];
     switch (action.type) {
       case 'chooseUpgrade':
         return `pick${p?.upgrades[action.index]?.rarity ?? 1}`;
@@ -313,19 +500,20 @@ export class Game {
     }
   }
 
-  private consume(): void {
-    this.view.handleEvents(this.world.events);
-    this.audio.handle(this.world.events, this.world.players[0]?.x ?? 0);
+  private consume(events: readonly SimEvent[] = this.world.events): void {
+    this.view.handleEvents(events);
+    this.audio.handle(events, this.world.players[this.localPlayer]?.x ?? 0, this.localPlayer);
   }
 
   private onKey(e: KeyboardEvent): void {
     // A menu already handled it (see useHotkeys).
     if (e.repeat || e.defaultPrevented || typingIn(e)) return;
     if (e.code === 'Escape' || e.code === 'KeyP') {
+      // In co-op this only opens the menu: the game keeps going.
       if (this.inWave) this.setPaused(!this.paused);
     } else if (e.code === 'KeyM') {
       this.toggleMute();
-    } else if (import.meta.env.DEV && e.code === 'KeyN' && this.inWave) {
+    } else if (import.meta.env.DEV && e.code === 'KeyN' && this.inWave && !this.net) {
       // Dev shortcut: skip to the end of the wave. That isn't in the replay, so the run is unranked.
       this.world.waveTick = Math.max(this.world.waveTick, this.world.waveTicks - 1);
       this.ranked = null;
@@ -339,7 +527,7 @@ export class Game {
     return world;
   }
 
-  private notify(): void {
+  notify(): void {
     for (const listener of this.listeners) listener();
   }
 }

@@ -1,6 +1,6 @@
 # Survivors-like: Bob vs. the Haunted Swamp — Game Plan
 
-> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a passed in Chromium, Firefox, WebKit and on an Android phone; 5b (party scaling and revives) is built; 5c (server and lobby) is next. Working title is TBD.
+> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a passed in Chromium, Firefox, WebKit and on an Android phone; 5b (party scaling and revives) is built; 5c (server and lobby) is built and tested locally, waiting on the Railway deploy. Working title is TBD.
 > **Decided 2026-10-27:** inspired-by naming (no RuneScape names in the game) · PixiJS + own sim · art via GPT Image.
 > Library versions below were checked on npm today. Art is generated with GPT Image through the user's ChatGPT subscription (§6).
 
@@ -468,6 +468,11 @@ This replaces the earlier snapshot plan. That plan rejected lockstep because cro
   - Desktop holds 102–104 fps with 4 players carrying 6 weapons each and about 300 enemies. The sim costs about 0.25 ms a tick, so drawing is the real cost on phones. Still to do: the same check on a mid-range phone.
   - The co-op replay format moves to 5c, where the server's input log defines it.
 - **5c Server and lobby (medium).** `apps/server`, rooms, invite links, the lobby, and lockstep play between two browsers locally, then deployed to the chosen host.
+  - **2026-10-29: built and tested locally.** `packages/coop` holds the protocol and the one lockstep rule (`applyFrame`) shared by the server and browsers. `apps/server` (socket.io) has `Room`: lobby, seats, host hand-over, the 60 fps clock in 3-frame bundles, server-validated actions, the 45 s auto-ready (instant for disconnected players), hash checks with resync from the frame log, and rejoin by token. 15 tests in `apps/server/test`.
+  - In the client, `Coop` (socket.io-client, loaded only when co-op opens) and `Game` play server frames with a small jitter buffer. A local player index drives the camera, HUD, menus and your own sounds. There's a lobby with Copy and Share, a waiting screen with the shop countdown, and co-op pause and results.
+  - Two-browser test: invite link, ready, start, wave 1, shop, wave 2. Every world hash matched at frames 299–1499. A reload rejoined within 1 frame, the host leaving handed the room over, and there were no errors and no drift.
+  - Production mode accepts only `ALLOWED_ORIGINS` (checked on the WebSocket itself). `/health` serves Railway. The build is `apps/server/dist/server.mjs` (75 kB; socket.io stays in node_modules).
+  - **To go live:** a Railway service from the GitHub repo. Build `npm run build -w @game/server`, start `npm run start -w @game/server`, healthcheck `/health`, variable `ALLOWED_ORIGINS` = the Vercel URL, then a generated domain. Then set `VITE_COOP_URL` on Vercel to that domain and redeploy. Until then, "Play with friends" stays hidden in production.
 - **5d Co-op feel (medium).** Colours, name tags, teammate HP, off-screen arrows, the spectator camera, the ready timer, reconnect fast-forward, Leave and host hand-over.
 - **5e Co-op hiscores (small).** Duo, Trio and Squad boards, weekly and all time.
 - **5f Rollback (medium, only if needed).** Instant local movement if the input delay feels bad over 4G.
