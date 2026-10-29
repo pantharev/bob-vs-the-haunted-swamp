@@ -1,4 +1,4 @@
-import { ZONES, type WeaponId, type ZoneDef } from '@game/content';
+import { MAX_PARTY, WEAPON_IDS, ZONES, type WeaponId, type ZoneDef } from '@game/content';
 import {
   applyAction,
   createWorld,
@@ -6,6 +6,7 @@ import {
   quantizeInput,
   ReplayRecorder,
   step,
+  type InputCommand,
   type RunAction,
   type World,
 } from '@game/sim';
@@ -41,6 +42,13 @@ export interface RunOptions {
   wave?: number;
 }
 
+/** Plays local teammates (`?bots=N`, co-op testing before the server exists). */
+export interface BotBrain {
+  botInput(world: World, player: World['players'][number]): InputCommand;
+  /** Spends one bot's intermission: picks, shopping, then ready. */
+  botIntermission(world: World, index: number): void;
+}
+
 /** A run that can go on the hiscores: its ticket, and the replay being recorded. */
 interface RankedRun {
   readonly ticket: string;
@@ -59,6 +67,7 @@ export class Game {
   lastWeapon: WeaponId = 'scimitar';
   readonly hiscores = new Hiscores();
   private ranked: RankedRun | null = null;
+  private bots: { readonly count: number; readonly brain: BotBrain } | null = null;
   private accumulator = 0;
   private readonly listeners = new Set<() => void>();
 
@@ -90,10 +99,17 @@ export class Game {
     return this.screen === 'run' && this.world.phase === 'wave';
   }
 
+  /** Every following run gets `count` bot teammates. Such runs aren't ranked. */
+  useBots(count: number, brain: BotBrain): void {
+    this.bots = { count: Math.max(0, Math.min(count, MAX_PARTY - 1)), brain };
+  }
+
   startRun({ weapon, seed, wave }: RunOptions): void {
     this.lastWeapon = weapon;
-    // Only a normal start can be ranked: the server picks the seed and the run starts at wave 1.
-    const ticket = seed === undefined && wave === undefined ? this.hiscores.take() : null;
+    const bots = this.bots?.count ?? 0;
+    // Only a normal solo start can be ranked: the server picks the seed and the run starts at wave 1.
+    const ticket =
+      seed === undefined && wave === undefined && bots === 0 ? this.hiscores.take() : null;
     const runSeed = ticket?.seed ?? seed ?? Date.now() >>> 0;
     this.ranked = ticket
       ? { ticket: ticket.ticket, recorder: new ReplayRecorder(runSeed, weapon), posted: null }
@@ -101,7 +117,10 @@ export class Game {
     this.world = createWorld({
       seed: runSeed,
       zone: ZONES.wolfmoor,
-      weapons: [weapon],
+      // Bots take the next weapons in the list, so a party shows a mix.
+      loadouts: Array.from({ length: 1 + bots }, (_, i) => [
+        i === 0 ? weapon : WEAPON_IDS[(WEAPON_IDS.indexOf(weapon) + i) % WEAPON_IDS.length]!,
+      ]),
       startWave: wave,
     });
     this.view.setWorld(this.world);
@@ -186,6 +205,7 @@ export class Game {
   private frame(deltaMS: number, fps: number): void {
     const frameSeconds = Math.min(deltaMS / 1000, MAX_FRAME_SECONDS);
     const world = this.world;
+    this.botsShop(world);
     const running = this.inWave && !this.paused;
 
     if (running) {
@@ -196,7 +216,7 @@ export class Game {
         // Quantized so a replay of this run steps with exactly the same numbers.
         const command = quantizeInput(this.input.sample());
         this.ranked?.recorder.input(command);
-        step(world, [command]);
+        step(world, [command, ...this.botInputs(world)]);
         this.consume();
         this.accumulator -= DT;
         steps++;
@@ -270,6 +290,26 @@ export class Game {
       case 'ready':
         // The wave's own horn follows straight away.
         return 'click';
+    }
+  }
+
+  private botInputs(world: World): InputCommand[] {
+    const brain = this.bots?.brain;
+    if (!brain) return [];
+    return world.players.slice(1).map((p) => quantizeInput(brain.botInput(world, p)));
+  }
+
+  /** Bots shop the moment an intermission opens; the last one to be ready may start the wave. */
+  private botsShop(world: World): void {
+    const brain = this.bots?.brain;
+    if (!brain || this.screen !== 'run' || world.phase !== 'intermission') return;
+    for (let i = 1; i < world.players.length; i++) brain.botIntermission(world, i);
+    // Re-read: the bots' Ready may have started the wave.
+    if (this.inWave) {
+      this.accumulator = 0;
+      this.input.reset();
+      this.consume();
+      this.notify();
     }
   }
 

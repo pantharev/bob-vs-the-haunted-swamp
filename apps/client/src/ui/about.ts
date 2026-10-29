@@ -14,6 +14,17 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '0.5',
+    date: '2026-10-29',
+    title: 'Co-op groundwork',
+    notes: [
+      'Co-op for up to 4 friends is on the way. The rules are in: the horde grows with every extra player (more monsters, a little tougher, much tougher elites), tuned so a party wins about as often as a solo player.',
+      'Downed, not dead: stand next to a fallen teammate for 3 seconds to revive them at half HP. Anyone still down at the end of a wave is back for the shop and starts the next wave at half HP.',
+      'Try it early with bot teammates: add ?bots=3 to the address. Those runs don’t go on the hiscores.',
+      'Behind the scenes: proved every browser (Chrome, Firefox, Safari’s engine, Android) runs the game exactly the same, which co-op relies on.',
+    ],
+  },
+  {
     version: '0.4',
     date: '2026-10-28',
     title: 'Hiscores',

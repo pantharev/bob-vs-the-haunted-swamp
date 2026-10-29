@@ -13,6 +13,7 @@ export {
   type Replay,
   type ReplayAction,
 } from './replay';
+export { enemyCap, reviveProgress, spawnRate } from './party';
 export { createWorld, type WorldOptions } from './run';
 export { buyBlocker, rerollPrice, sellPrice, SHOP_SLOTS } from './shop';
 export { pickupRange, xpToNext } from './stats';

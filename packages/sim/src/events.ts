@@ -36,6 +36,8 @@ export type SimEvent =
       readonly dodged: boolean;
     }
   | { readonly type: 'playerDeath'; readonly player: number }
+  /** A downed co-op player is back up (PLAN.md §9). */
+  | { readonly type: 'playerRevive'; readonly player: number }
   | {
       readonly type: 'attack';
       readonly player: number;

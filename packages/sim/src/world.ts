@@ -59,6 +59,10 @@ export interface Player {
   maxHp: number;
   /** Ticks of invulnerability left after being hit. */
   invulnerable: number;
+  /** Co-op: ticks of revive progress while downed (`alive` false). */
+  revive: number;
+  /** Was down when the last wave ended: starts the next one with REVIVE.hp. */
+  returning: boolean;
   /** Fractional HP accumulated by regen. */
   regenCarry: number;
   /** Standing in slime goo this tick. */
@@ -257,6 +261,8 @@ export function createPlayer(
     hp: character.maxHp,
     maxHp: character.maxHp,
     invulnerable: 0,
+    revive: 0,
+    returning: false,
     regenCarry: 0,
     slowed: false,
     level: 1,

@@ -1,6 +1,6 @@
 # Survivors-like: Bob vs. the Haunted Swamp — Game Plan
 
-> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a passed in Chromium, Firefox and WebKit; real-device checks (iPhone, Android) are next. Working title is TBD.
+> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a passed in Chromium, Firefox, WebKit and on an Android phone; 5b (party scaling and revives) is built; 5c (server and lobby) is next. Working title is TBD.
 > **Decided 2026-10-27:** inspired-by naming (no RuneScape names in the game) · PixiJS + own sim · art via GPT Image.
 > Library versions below were checked on npm today. Art is generated with GPT Image through the user's ChatGPT subscription (§6).
 
@@ -361,15 +361,16 @@ Up to 4 friends in one run, joined by a shared link. Pulled forward ahead of Pha
 - **Co-op hiscores:** separate weekly and all-time boards per party size (Duo, Trio, Squad), with the team's names on each entry.
 
 ### Fairness: monsters scale with the party
-Each player brings their own weapons, so the horde has to grow. These are starting numbers, tuned with bot parties:
+Each player brings their own weapons, so the horde has to grow. Tuned with bot parties (2026-10-29, 100 seeds each):
 
 | Players | Spawn rate | Enemy HP | Elite HP | Enemy cap |
 |---|---|---|---|---|
 | 1 | ×1 | ×1 | ×1 | 300 |
-| 2 | ×1.6 | ×1.15 | ×1.8 | 340 |
-| 3 | ×2.2 | ×1.3 | ×2.6 | 380 |
-| 4 | ×2.8 | ×1.45 | ×3.4 | 420 |
+| 2 | ×1.6 | ×1.05 | ×1.6 | 340 |
+| 3 | ×2.2 | ×1.1 | ×2.2 | 380 |
+| 4 | ×2.8 | ×1.15 | ×2.8 | 420 |
 
+- **Result:** bots win 37% solo, and 38% / 29% / 30% in parties of 2 / 3 / 4, losing 23–25% of their HP per wave in every size. The first guess (enemy HP up to ×1.45, elites ×3.4) was too hard: each player earned 30–45% fewer coins than solo, so builds fell behind.
 - Damage per hit doesn't change: each player faces the same danger per contact, just more of it at once.
 - Coins and XP work as they do now. Each coin goes to whoever picks it up, and loose coins at wave end are split evenly (the sim already does this). More monsters means roughly the same coins per player.
 - **Tuning:** the headless bot plays 1-, 2-, 3- and 4-player runs on 100 seeds each. The factors are adjusted until bot parties win about as often, and lose about as much HP, as a solo bot. All factors live in `packages/content` (`COOP_SCALING`).
@@ -460,8 +461,12 @@ This replaces the earlier snapshot plan. That plan rejected lockstep because cro
 
 ### Phase 5: Co-op multiplayer (large; pulled ahead of Phase 4, plan in §9)
 - **5a Determinism check (small).** Play one recorded run in Chrome, Firefox, Safari on iOS and Chrome on Android, and compare world hashes every second. Identical everywhere means go with lockstep; otherwise switch to the snapshot fallback before building more.
-  - **2026-10-29: the three engines pass.** The `?sync` page plays a full solo run and a full 4-bot party run (421 checkpoints each). Every hash matched Node in Chromium (Edge 156), Firefox 157 (SpiderMonkey) and WebKit 27.2 (JavaScriptCore), both locally and on the live site. `npm run sync:browsers [url]` re-runs it; Playwright Firefox and WebKit are installed for that. Still to confirm on real devices: Safari on iPhone and Chrome on Android.
+  - **2026-10-29: the three engines pass.** The `?sync` page plays a full solo run and a full 4-bot party run (421 checkpoints each). Every hash matched Node in Chromium (Edge 156), Firefox 157 (SpiderMonkey) and WebKit 27.2 (JavaScriptCore), both locally and on the live site. `npm run sync:browsers [url]` re-runs it; Playwright Firefox and WebKit are installed for that. Chrome on a real Android phone also passes (Android 10, Chrome 156). Still to confirm on a real iPhone (Safari).
 - **5b Party sim (small–medium).** Party scaling, down and revive, co-op replays and the world hash. Bot parties of 1–4 tune `COOP_SCALING`, and a 4-player wave 10 is measured on a mid-range phone.
+  - **2026-10-29: built.** `COOP_SCALING` and `REVIVE` in content, `sim/src/party.ts` (spawn rate, HP and cap by party size; the 3 s revive; returners at 50% HP), tests in `party.test.ts`, and the opt-in sweep `BALANCE=100 npx vitest run party.balance --silent=false`. The test bot now revives teammates.
+  - `?bots=3` adds local bot teammates to an ordinary run, to try co-op before the server exists. Those runs aren't ranked.
+  - Desktop holds 102–104 fps with 4 players carrying 6 weapons each and about 300 enemies. The sim costs about 0.25 ms a tick, so drawing is the real cost on phones. Still to do: the same check on a mid-range phone.
+  - The co-op replay format moves to 5c, where the server's input log defines it.
 - **5c Server and lobby (medium).** `apps/server`, rooms, invite links, the lobby, and lockstep play between two browsers locally, then deployed to the chosen host.
 - **5d Co-op feel (medium).** Colours, name tags, teammate HP, off-screen arrows, the spectator camera, the ready timer, reconnect fast-forward, Leave and host hand-over.
 - **5e Co-op hiscores (small).** Duo, Trio and Squad boards, weekly and all time.

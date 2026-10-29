@@ -41,6 +41,9 @@ async function boot(): Promise<void> {
 
   // Dev/test shortcuts: ?weapon=staff&wave=5&seed=42 starts a run immediately.
   const params = new URLSearchParams(location.search);
+  // ?bots=3: local bot teammates, to try co-op before the server exists (PLAN.md §9).
+  const bots = Number(params.get('bots'));
+  if (bots > 0) game.useBots(bots, await import('../../../packages/sim/test/bot'));
   const weapon = params.get('weapon');
   if (weapon && (WEAPON_IDS as readonly string[]).includes(weapon)) {
     const seed = Number(params.get('seed'));

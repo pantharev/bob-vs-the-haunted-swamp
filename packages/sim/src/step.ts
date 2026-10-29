@@ -1,6 +1,7 @@
 import { updateEnemies } from './enemies';
 import type { InputCommand } from './input';
 import { updatePickups } from './pickups';
+import { updateRevives } from './party';
 import { contactDamage, updatePlayers } from './player';
 import { endRun, endWave } from './run';
 import { updateSpawner } from './spawner';
@@ -22,6 +23,7 @@ export function step(world: World, inputs: readonly InputCommand[]): void {
   world.stats.timeTicks++;
 
   updatePlayers(world, inputs);
+  updateRevives(world);
   updateSpawner(world);
   updateEnemies(world);
   // Enemies moved: rebuild the grid before anything queries positions.

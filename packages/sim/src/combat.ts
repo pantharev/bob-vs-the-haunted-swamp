@@ -2,6 +2,7 @@ import { ELITE, ENEMIES, type EnemyId, type WeaponDef, type WeaponId } from '@ga
 import { MAX_ENEMY_RADIUS, MAX_GOO, MAX_PICKUPS, seconds } from './constants';
 import type { PickupKind } from './events';
 import { randomUnit, type Vec } from './math';
+import { partyHp } from './party';
 import { scoreKill } from './score';
 import {
   armourFactor,
@@ -26,7 +27,7 @@ const explosionNear: number[] = [];
 export function spawnEnemy(world: World, id: EnemyId, x: number, y: number, elite: boolean): Enemy {
   const def = ENEMIES[id];
   const wave = world.waves[world.wave - 1];
-  const hpScale = (wave?.hpScale ?? 1) * (elite ? ELITE.hp : 1);
+  const hpScale = (wave?.hpScale ?? 1) * (elite ? ELITE.hp : 1) * partyHp(world, elite);
   const damageScale = (wave?.damageScale ?? 1) * (elite ? ELITE.damage : 1);
 
   const e = world.pools.enemies.pop() ?? blankEnemy();

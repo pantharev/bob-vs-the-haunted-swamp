@@ -1,7 +1,8 @@
 import type { SpawnRule } from '@game/content';
-import { MAX_ENEMIES, seconds } from './constants';
+import { seconds } from './constants';
 import { spawnEnemy } from './combat';
 import { clamp, randomUnit, type Vec } from './math';
+import { enemyCap, spawnRate } from './party';
 import type { World } from './world';
 
 /** Spawn markers flash this long before the enemy appears. */
@@ -33,7 +34,8 @@ export function updateSpawner(world: World): void {
         return;
       }
       spawnRule(world, rule);
-      world.ruleNext[i] = next + Math.max(1, seconds(rule.every));
+      // Bigger parties face a faster horde.
+      world.ruleNext[i] = next + Math.max(1, seconds(rule.every / spawnRate(world)));
     });
   }
 
@@ -61,7 +63,7 @@ function spawnRule(world: World, rule: SpawnRule): void {
   let pending = world.enemies.length;
   for (const m of world.markers) pending += m.count;
   // Elites always get through; fodder waits for room.
-  if (!rule.elite && pending + count > MAX_ENEMIES) return;
+  if (!rule.elite && pending + count > enemyCap(world)) return;
 
   const elite = rule.elite ?? false;
   if (rule.pack) {

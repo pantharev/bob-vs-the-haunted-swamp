@@ -8,6 +8,7 @@
 
 import { WOLFMOOR_WAVES, type WaveDef } from './waves';
 
+export * from './coop';
 export * from './enemies';
 export * from './items';
 export * from './score';

@@ -20,6 +20,8 @@ import {
 
 const THREAT_RADIUS = 240;
 const WALL_MARGIN = 220;
+/** Close enough to a downed teammate to revive them (REVIVE.radius is 70). */
+const REVIVE_STAND = 50;
 const SKILL_PRIORITY: readonly SkillId[] = [
   'attack',
   'hitpoints',
@@ -83,6 +85,30 @@ export function botInput(world: World, p: Player): InputCommand {
     const pull = threat > 0.002 ? 0.3 : 1;
     ax += (cx / d) * pull;
     ay += (cy / d) * pull;
+  }
+
+  // Co-op: go and stand on the nearest downed teammate, harder the calmer it is.
+  let downed = Infinity;
+  let rx = 0;
+  let ry = 0;
+  for (const q of world.players) {
+    if (q.alive || q === p) continue;
+    const dx = q.x - p.x;
+    const dy = q.y - p.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < downed) {
+      downed = d2;
+      rx = dx;
+      ry = dy;
+    }
+  }
+  if (downed < Infinity) {
+    const d = Math.sqrt(downed);
+    // Close enough to revive: hold still on them.
+    if (d < REVIVE_STAND) return { moveX: 0, moveY: 0 };
+    const pull = threat > 0.002 ? 1.2 : 3;
+    ax += (rx / d) * pull;
+    ay += (ry / d) * pull;
   }
 
   const { width, height } = world.arena;

@@ -1,7 +1,8 @@
-import { BOB, type CharacterDef, type WeaponId, type ZoneDef } from '@game/content';
+import { BOB, REVIVE, type CharacterDef, type WeaponId, type ZoneDef } from '@game/content';
 import { seconds } from './constants';
 import type { RunOutcome } from './events';
 import { gainXp } from './combat';
+import { standUp } from './party';
 import { scoreVictory, scoreWave } from './score';
 import { openShop } from './shop';
 import { recomputeStats } from './stats';
@@ -60,7 +61,8 @@ export function startWave(world: World, wave: number): void {
     p.y = p.prevY = arena.height / 2;
     p.vx = p.vy = 0;
     if (!p.alive) return;
-    p.hp = p.maxHp;
+    p.hp = p.returning ? Math.max(1, Math.ceil(p.maxHp * REVIVE.hp)) : p.maxHp;
+    p.returning = false;
     p.invulnerable = WAVE_START_IFRAMES;
     p.regenCarry = 0;
     p.intermission = 'ready';
@@ -108,7 +110,13 @@ export function endWave(world: World): void {
     return;
   }
   world.phase = 'intermission';
-  for (const p of alive) {
+  // Co-op: anyone still down gets back up to level up and shop, and starts the next wave weakened.
+  for (const p of world.players) {
+    if (p.alive) continue;
+    standUp(p);
+    p.returning = true;
+  }
+  for (const p of world.players) {
     if (p.pendingLevels > 0) {
       p.intermission = 'levelUp';
       rollUpgrades(world, p);
