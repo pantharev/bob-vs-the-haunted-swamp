@@ -1,4 +1,6 @@
 import type { ClientToServer, ServerToClient } from '@game/coop';
+import { MemoryStore, recordTeam } from '@game/hiscores';
+import { upstashFromEnv } from '@game/hiscores/upstash';
 import { randomBytes, randomInt } from 'node:crypto';
 import { createServer } from 'node:http';
 import { performance } from 'node:perf_hooks';
@@ -10,6 +12,8 @@ import { roomCode, Rooms } from './rooms';
  * lockstep clocks live in memory; GET /health is for the platform's checks.
  *   PORT             default 8787
  *   ALLOWED_ORIGINS  comma-separated, e.g. https://bob-vs-the-haunted-swamp-ruby.vercel.app
+ *   KV_REST_API_URL, KV_REST_API_TOKEN  the hiscores' Upstash Redis (the same one Vercel uses),
+ *                    for the Duo, Trio and Squad boards. Without them, party runs aren't ranked.
  */
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -42,10 +46,13 @@ const RULES =
 const log = (message: string) => console.log(`${new Date().toISOString()} ${message}`);
 const now = () => performance.now();
 
+// Dev without Upstash credentials keeps its boards in memory, like the Vite dev server's API.
+const store = upstashFromEnv(process.env) ?? (PRODUCTION ? null : new MemoryStore());
+
 const http = createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'content-type': 'text/plain' });
-    res.end(`ok ${rooms.size} rooms, rules ${RULES}`);
+    res.end(`ok ${rooms.size} rooms, rules ${RULES}, hiscores ${store ? 'on' : 'off'}`);
     return;
   }
   res.writeHead(404);
@@ -72,6 +79,7 @@ const rooms = new Rooms(
   },
   RULES,
   log,
+  store && ((players, run) => recordTeam(store, players, run, Date.now())),
 );
 
 /** Per-socket message budget per second, by kind: inputs come at up to 60 a second. */
@@ -126,7 +134,8 @@ setInterval(() => rooms.tick(now()), TICK_MS);
 http.listen(PORT, () =>
   log(
     `co-op server on :${PORT}, rules ${RULES}, ` +
-      (ALLOWED.length ? `allowing ${ALLOWED.join(', ')}` : 'no ALLOWED_ORIGINS set'),
+      (ALLOWED.length ? `allowing ${ALLOWED.join(', ')}` : 'no ALLOWED_ORIGINS set') +
+      (store ? '' : ', no hiscores (KV_REST_API_URL and KV_REST_API_TOKEN not set)'),
   ),
 );
 

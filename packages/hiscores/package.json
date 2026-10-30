@@ -1,0 +1,16 @@
+{
+  "name": "@game/hiscores",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./upstash": "./src/upstash.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@game/content": "*",
+    "@upstash/redis": "^1.40.0"
+  }
+}

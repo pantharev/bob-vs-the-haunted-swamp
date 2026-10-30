@@ -1,7 +1,7 @@
+import { MemoryStore, type Store } from '@game/hiscores';
+import { upstashFromEnv } from '@game/hiscores/upstash';
 import { createApi } from './api';
 import { nodeHandler } from './node';
-import { MemoryStore, type Store } from './store';
-import { upstashFromEnv } from './upstash';
 
 // Survives Vite reloading this module, so dev hiscores last as long as the dev server.
 const shared = globalThis as { hiscoresDevStore?: Store };

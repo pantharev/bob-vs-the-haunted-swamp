@@ -4,7 +4,7 @@ import { useState } from 'preact/hooks';
 import type { Game } from '../game';
 import { cssColor } from '../coop/party';
 import { HiscoreError, savedName, saveName } from '../hiscores/client';
-import { NAME_MAX, NAME_PATTERN } from '../hiscores/protocol';
+import { isTeamSize, NAME_MAX, NAME_PATTERN, PARTY_BOARD_NAMES } from '../hiscores/protocol';
 import { useHotkeys } from './app';
 import { formatScore, formatTime, WEAPON_ICONS } from './format';
 import { InfoScreen, useInfoPage } from './info';
@@ -55,7 +55,14 @@ export function ResultsScreen({ game, player }: { game: Game; player: Player }) 
           Kills {formatScore(stats.killPoints)} · Wave bonus {formatScore(stats.waveBonus)}
           {won && ` · Victory ${formatScore(stats.victoryBonus)}`}
         </p>
-        {coop ? <PartyResults game={game} /> : <PostScore game={game} />}
+        {coop ? (
+          <>
+            <TeamPosted game={game} />
+            <PartyResults game={game} />
+          </>
+        ) : (
+          <PostScore game={game} />
+        )}
         {/* Co-op shows everyone in the table above instead. */}
         <dl class="summary" hidden={coop}>
           <dt>Kills</dt>
@@ -124,6 +131,26 @@ function PartyResults({ game }: { game: Game }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+/** Co-op: where the party's run placed. The co-op server posts it by itself. */
+function TeamPosted({ game }: { game: Game }) {
+  const size = game.world.players.length;
+  if (!isTeamSize(size)) {
+    return <p class="hint">Play with at least one friend to go on the co-op hiscores.</p>;
+  }
+  const board = PARTY_BOARD_NAMES[size];
+  const ranked = game.teamPlacing;
+  if (!ranked) return <p class="hint">Posting to the {board} hiscores…</p>;
+  if (!ranked.ok) return <p class="hint">{ranked.error}</p>;
+  return (
+    <p class="posted">
+      {board} hiscores: #{ranked.week.rank} this week · #{ranked.all.rank} all time
+      {!ranked.all.improved && (
+        <small>Your team&apos;s best of {formatScore(ranked.all.best)} still stands.</small>
+      )}
+    </p>
   );
 }
 

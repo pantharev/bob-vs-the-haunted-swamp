@@ -12,6 +12,7 @@
   "dependencies": {
     "@game/content": "*",
     "@game/coop": "*",
+    "@game/hiscores": "*",
     "@game/sim": "*",
     "socket.io": "^4.8.4"
   },

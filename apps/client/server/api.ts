@@ -1,32 +1,38 @@
 import { ZONES, type ZoneDef } from '@game/content';
 import { cleanName, NAME_MAX } from '@game/coop';
-import { ReplayError, replayRun, TICK_RATE, type Replay, type World } from '@game/sim';
 import {
+  BOARD_SIZE,
+  boardKey,
+  isTeamSize,
+  KEY_PREFIX,
   PLAYER_ID_PATTERN,
+  readTeamBoard,
+  toPlacing,
+  WEEK_TTL,
   type BoardId,
-  type BoardResponse,
-  type HiscoreEntry,
-  type RunSubmission,
-  type RunSummary,
-  type SubmitResponse,
-  type TicketResponse,
+  type BoardRow,
+  type Store,
+} from '@game/hiscores';
+import { ReplayError, replayRun, TICK_RATE, type Replay, type World } from '@game/sim';
+import type {
+  BoardResponse,
+  HiscoreEntry,
+  RunSubmission,
+  RunSummary,
+  SubmitResponse,
+  TicketResponse,
 } from '../src/hiscores/protocol';
-import type { BoardRow, Store } from './store';
 
 /**
  * The hiscores API (PLAN.md §8):
  *   POST /api/ticket    { player }  → a seed for one ranked run
  *   POST /api/runs      RunSubmission → re-runs the replay, records the server's own score
- *   GET  /api/hiscores?board=week|all&player=…
+ *   GET  /api/hiscores?board=week|all&size=1|2|3|4&player=…
+ * Size 1 is solo; 2 to 4 are the co-op boards, which the co-op server records to.
  * Platform-free: server/node.ts adapts it to Node's http (Vercel and the Vite dev server).
  */
 
-/** Bump to start fresh boards, e.g. after a big balance change. */
-export const SEASON = 1;
-const PREFIX = `bob:s${SEASON}`;
 const TICKET_TTL = 24 * 60 * 60;
-const WEEK_TTL = 8 * 7 * 24 * 60 * 60;
-export const BOARD_SIZE = 50;
 /** Requests per IP per minute. */
 const LIMITS = { ticket: 30, runs: 10, hiscores: 120 } as const;
 /** A run can't take less real time than its wave time; this allows for rounding. */
@@ -101,7 +107,7 @@ export function createApi({
     const [seed, ...rest] = crypto.getRandomValues(new Uint32Array(5));
     const id = [...rest].map((n) => n.toString(16).padStart(8, '0')).join('');
     const value: Ticket = { seed: seed!, player, issued: now() };
-    await store.put(`${PREFIX}:ticket:${id}`, JSON.stringify(value), TICKET_TTL);
+    await store.put(`${KEY_PREFIX}:ticket:${id}`, JSON.stringify(value), TICKET_TTL);
     return ok({ ticket: id, seed: seed! } satisfies TicketResponse);
   }
 
@@ -121,7 +127,7 @@ export function createApi({
     if (await limited(store, 'runs', req.ip))
       return fail(429, 'Too many runs posted. Try again in a minute.');
 
-    const stored = await store.take(`${PREFIX}:ticket:${ticketId}`);
+    const stored = await store.take(`${KEY_PREFIX}:ticket:${ticketId}`);
     if (!stored)
       return fail(410, "This run can't be posted: its ticket expired or was already used.");
     const ticket = JSON.parse(stored) as Ticket;
@@ -148,57 +154,44 @@ export function createApi({
     const details = JSON.stringify(summarize(world, name, replay as Replay, now()));
     const entry = { member: player, score: world.stats.score, details };
     const [week, all] = await Promise.all([
-      store.record(boardKey('week'), entry, WEEK_TTL),
-      store.record(boardKey('all'), entry, null),
+      store.record(boardKey('week', 1, now()), entry, WEEK_TTL),
+      store.record(boardKey('all', 1, now()), entry, null),
     ]);
-    const placing = (p: typeof week) => ({ rank: p.rank + 1, best: p.best, improved: p.improved });
     return ok({
       score: world.stats.score,
-      boards: { week: placing(week), all: placing(all) },
+      boards: { week: toPlacing(week), all: toPlacing(all) },
     } satisfies SubmitResponse);
   }
 
   async function board(store: Store, req: ApiRequest): Promise<ApiResponse> {
     const id: BoardId = req.query.get('board') === 'all' ? 'all' : 'week';
-    const player = req.query.get('player');
+    const size = Number(req.query.get('size') ?? 1);
+    const raw = req.query.get('player');
+    const player = raw && PLAYER_ID_PATTERN.test(raw) ? raw : null;
     if (await limited(store, 'hiscores', req.ip))
       return fail(429, 'Too many requests. Try again in a minute.');
-    const key = boardKey(id);
+    // Without a player the response is the same for everyone, so the CDN can share it briefly.
+    const cacheControl = player ? 'no-store' : 'public, s-maxage=10, stale-while-revalidate=30';
+    if (isTeamSize(size))
+      return { ...ok(await readTeamBoard(store, id, size, player, now())), cacheControl };
+
+    const key = boardKey(id, 1, now());
     const [rows, mine] = await Promise.all([
       store.top(key, BOARD_SIZE),
-      player && PLAYER_ID_PATTERN.test(player) ? store.find(key, player) : Promise.resolve(null),
+      player ? store.find(key, player) : Promise.resolve(null),
     ]);
     const body: BoardResponse = {
       board: id,
       entries: rows.map(toEntry).filter((e) => e !== null),
       you: mine ? toEntry(mine) : null,
     };
-    // Without a player the response is the same for everyone, so the CDN can share it briefly.
-    return {
-      ...ok(body),
-      cacheControl: player ? 'no-store' : 'public, s-maxage=10, stale-while-revalidate=30',
-    };
-  }
-
-  function boardKey(id: BoardId): string {
-    return id === 'all' ? `${PREFIX}:all` : `${PREFIX}:week:${isoWeek(now())}`;
+    return { ...ok(body), cacheControl };
   }
 
   async function limited(store: Store, kind: keyof typeof LIMITS, ip: string): Promise<boolean> {
     const minute = Math.floor(now() / 60_000);
-    return (await store.count(`${PREFIX}:rate:${kind}:${ip}:${minute}`, 120)) > LIMITS[kind];
+    return (await store.count(`${KEY_PREFIX}:rate:${kind}:${ip}:${minute}`, 120)) > LIMITS[kind];
   }
-}
-
-/** ISO 8601 week of a UTC time, like "2026-W44". Weeks start on Monday. */
-export function isoWeek(ms: number): string {
-  const date = new Date(ms);
-  const day = date.getUTCDay() || 7;
-  // The Thursday of this week decides which year the week belongs to.
-  const thursday = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 4 - day);
-  const year = new Date(thursday).getUTCFullYear();
-  const week = Math.floor((thursday - Date.UTC(year, 0, 1)) / 86_400_000 / 7) + 1;
-  return `${year}-W${String(week).padStart(2, '0')}`;
 }
 
 function summarize(world: World, name: string, replay: Replay, at: number): RunSummary {

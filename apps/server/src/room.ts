@@ -15,6 +15,7 @@ import {
   type RunStart,
   type ServerToClient,
 } from '@game/coop';
+import { PLAYER_ID_PATTERN, type TeamPlacing, type TeamSummary } from '@game/hiscores';
 import { applyAction, worldHash, type RunAction, type World } from '@game/sim';
 
 /**
@@ -40,6 +41,12 @@ export interface Randomness {
   token(): string;
 }
 
+/** Puts a finished party run on the hiscores, by its players' ids. */
+export type RecordTeam = (
+  players: readonly string[],
+  run: Omit<TeamSummary, 'date'>,
+) => Promise<TeamPlacing>;
+
 interface Seat {
   readonly seat: number;
   name: string;
@@ -47,6 +54,8 @@ interface Seat {
   ready: boolean;
   /** Rejoins this seat; cleared when the player leaves on purpose. */
   token: string;
+  /** The browser's anonymous hiscores id. Never sent to other players. */
+  readonly id: string;
   /** null while disconnected. */
   socket: string | null;
   /** Index into the running world's players, while a run is on. */
@@ -59,6 +68,8 @@ interface Run {
   readonly world: World;
   readonly seed: number;
   readonly roster: readonly RosterEntry[];
+  /** Hiscores ids, in roster order. */
+  readonly ids: readonly string[];
   /** Every frame so far, for rejoins and resyncs. */
   readonly frames: Frame[];
   /** Clock time the run started (frame 0). */
@@ -86,6 +97,8 @@ export class Room {
     private readonly out: Outbox,
     private readonly random: Randomness,
     private readonly log: (message: string) => void = () => {},
+    /** null: this server has no hiscores. */
+    private readonly record: RecordTeam | null = null,
   ) {}
 
   /** The running world (tests and diagnostics). */
@@ -119,7 +132,7 @@ export class Room {
 
   join(
     socket: string,
-    p: { name: unknown; weapon: unknown; token?: unknown },
+    p: { name: unknown; weapon: unknown; player?: unknown; token?: unknown },
     now: number,
   ): JoinResult {
     // A token takes back the seat it was issued for: reloads and dropped connections.
@@ -156,6 +169,11 @@ export class Room {
       weapon,
       ready: false,
       token: this.random.token(),
+      // Without a usable id the player still plays; their team just can't be told apart later.
+      id:
+        typeof p.player === 'string' && PLAYER_ID_PATTERN.test(p.player)
+          ? p.player
+          : this.random.token(),
       socket,
       player: null,
       input: [0, 0],
@@ -197,6 +215,7 @@ export class Room {
       world: startWorld({ seed, roster, frames: [] }),
       seed,
       roster,
+      ids: players.map((s) => s.id),
       frames: [],
       startedAt: now,
       actions: [],
@@ -313,7 +332,7 @@ export class Room {
     return frame;
   }
 
-  /** The run is over: back to the lobby, everyone un-readied. */
+  /** The run is over: back to the lobby, everyone un-readied, and parties go on the hiscores. */
   private finish(run: Run): void {
     this.log(`room ${this.code}: run over (${run.world.outcome}, score ${run.world.stats.score})`);
     this.run = null;
@@ -323,6 +342,36 @@ export class Room {
       if (s.socket === null) this.seats[s.seat] = null;
     }
     this.broadcast();
+    if (run.roster.length > 1) void this.rank(run);
+  }
+
+  /** Records a party's run. This server played it, so its score needs no checking. */
+  private async rank(run: Run): Promise<void> {
+    const { seed, world } = run;
+    if (!this.record) {
+      this.out.all('ranked', { seed, ok: false, error: 'Co-op hiscores are not set up yet.' });
+      return;
+    }
+    try {
+      const placing = await this.record(run.ids, {
+        team: run.roster.map((r) => ({ name: r.name, weapon: r.weapon })),
+        score: world.stats.score,
+        wave: world.wave,
+        won: world.outcome === 'victory',
+        kills: world.stats.kills,
+        ticks: world.stats.timeTicks,
+      });
+      const { week, all } = placing;
+      this.log(`room ${this.code}: ranked #${week.rank} this week, #${all.rank} all time`);
+      this.out.all('ranked', { seed, ok: true, ...placing });
+    } catch (error) {
+      this.log(`room ${this.code}: hiscores failed: ${String(error)}`);
+      this.out.all('ranked', {
+        seed,
+        ok: false,
+        error: "Couldn't reach the hiscores, so this run wasn't posted.",
+      });
+    }
   }
 
   private snapshot(run: Run): RunStart {

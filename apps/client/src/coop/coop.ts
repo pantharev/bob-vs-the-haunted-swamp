@@ -11,6 +11,7 @@ import {
 import type { RunAction } from '@game/sim';
 import type { Socket } from 'socket.io-client';
 import type { Game } from '../game';
+import { playerId } from '../hiscores/client';
 
 /**
  * The browser side of co-op (PLAN.md §9): the room you're in, its lobby, and
@@ -65,13 +66,15 @@ export class Coop {
   }
 
   create(name: string, weapon: WeaponId): Promise<void> {
-    return this.enter((s, ack) => s.emit('create', { name, weapon, rules: __RULES__ }, ack));
+    return this.enter((s, ack) =>
+      s.emit('create', { name, weapon, rules: __RULES__, player: playerId() }, ack),
+    );
   }
 
   join(code: string, name: string, weapon: WeaponId): Promise<void> {
     const token = readToken(code) ?? undefined;
     return this.enter((s, ack) =>
-      s.emit('join', { code, name, weapon, token, rules: __RULES__ }, ack),
+      s.emit('join', { code, name, weapon, token, rules: __RULES__, player: playerId() }, ack),
     );
   }
 
@@ -169,6 +172,7 @@ export class Coop {
     socket.on('start', (start) => this.begin(start));
     socket.on('resync', (start) => this.begin(start));
     socket.on('frames', (from, frames) => this.game.pushFrames(from, frames));
+    socket.on('ranked', (ranked) => this.game.teamRanked(ranked));
     socket.on('closed', (reason) => {
       this.error = reason;
       this.lobby = null;

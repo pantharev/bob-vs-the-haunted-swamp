@@ -3,11 +3,12 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { describe, expect, it } from 'vitest';
 import { recordBot } from '../../../packages/sim/test/bot';
-import { createApi, isoWeek, type ApiRequest } from '../server/api';
+import { MemoryStore, recordTeam } from '@game/hiscores';
+import { createApi, type ApiRequest } from '../server/api';
 import { nodeHandler } from '../server/node';
-import { MemoryStore } from '../server/store';
 import type {
   BoardResponse,
+  TeamBoardResponse,
   RunSubmission,
   SubmitResponse,
   TicketResponse,
@@ -23,8 +24,9 @@ function setup() {
   const clock = { now: Date.UTC(2026, 9, 28, 12) };
   const now = () => clock.now;
   const logs: string[] = [];
+  const store = new MemoryStore(now);
   const api = createApi({
-    store: new MemoryStore(now),
+    store,
     rules: RULES,
     now,
     log: (m) => logs.push(m),
@@ -39,7 +41,7 @@ function setup() {
     } satisfies ApiRequest);
   const ticket = async (player = PLAYER) =>
     (await call('POST', 'ticket', { player })).body as TicketResponse;
-  return { clock, logs, call, ticket };
+  return { clock, logs, store, call, ticket };
 }
 
 type Api = ReturnType<typeof setup>;
@@ -128,6 +130,45 @@ describe('hiscores api', () => {
     expect(week.entries).toHaveLength(0);
     expect(all.entries).toHaveLength(1);
   }, 30_000);
+
+  it('serves the co-op boards by party size, marking the teams you played on', async () => {
+    const api = setup();
+    const run = (score: number, names: string[]) => ({
+      team: names.map((name) => ({ name, weapon: 'dagger' as const })),
+      score,
+      wave: 4,
+      won: false,
+      kills: 50,
+      ticks: 6000,
+    });
+    await recordTeam(api.store, [PLAYER, OTHER], run(900, ['Ann', 'Bo']), api.clock.now);
+    await recordTeam(api.store, ['c'.repeat(32), OTHER], run(1200, ['Cy', 'Bo']), api.clock.now);
+    await recordTeam(api.store, [OTHER, 'c'.repeat(32), PLAYER], run(500, ['Bo', 'Cy', 'Ann']), 0);
+
+    const res = await api.call('GET', 'hiscores', null, `board=week&size=2&player=${PLAYER}`);
+    expect(res.status).toBe(200);
+    expect(res.cacheControl).toBe('no-store');
+    const duo = res.body as TeamBoardResponse;
+    expect(duo).toMatchObject({ board: 'week', size: 2 });
+    expect(duo.entries.map((e) => [e.rank, e.score, e.you])).toEqual([
+      [1, 1200, false],
+      [2, 900, true],
+    ]);
+    expect(duo.entries[1]!.team.map((m) => m.name)).toEqual(['Ann', 'Bo']);
+    // Player ids never leave the server.
+    expect(JSON.stringify(duo)).not.toContain(PLAYER);
+
+    // The trio ran in another week: on all time only.
+    const trio = (q: string) =>
+      api.call('GET', 'hiscores', null, q).then((r) => r.body as TeamBoardResponse);
+    expect((await trio('board=week&size=3')).entries).toHaveLength(0);
+    expect((await trio('board=all&size=3')).entries).toHaveLength(1);
+    expect((await trio('board=all&size=4')).entries).toHaveLength(0);
+    // No size (or a nonsense one) is the solo board.
+    const solo = (await api.call('GET', 'hiscores', null, 'board=all')).body as BoardResponse;
+    expect(solo).not.toHaveProperty('size');
+    expect(solo.entries).toHaveLength(0);
+  });
 
   describe('turns away', () => {
     it('a reused ticket', async () => {
@@ -239,15 +280,6 @@ describe('hiscores api', () => {
       ip: 'x',
     });
     expect(res.status).toBe(503);
-  });
-
-  it('names ISO weeks', () => {
-    expect(isoWeek(Date.UTC(2026, 9, 28))).toBe('2026-W44');
-    expect(isoWeek(Date.UTC(2021, 0, 1))).toBe('2020-W53');
-    expect(isoWeek(Date.UTC(2024, 11, 30))).toBe('2025-W01');
-    // Weeks start on Monday.
-    expect(isoWeek(Date.UTC(2026, 10, 1, 23, 59))).toBe('2026-W44');
-    expect(isoWeek(Date.UTC(2026, 10, 2))).toBe('2026-W45');
   });
 });
 

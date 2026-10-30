@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Shared by the browser, the Vercel API and the co-op server: no DOM, no Node.
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src"]
+}

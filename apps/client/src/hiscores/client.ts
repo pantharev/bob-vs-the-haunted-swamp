@@ -4,6 +4,8 @@ import type {
   BoardResponse,
   RunSubmission,
   SubmitResponse,
+  TeamBoardResponse,
+  TeamSize,
   TicketResponse,
 } from './protocol';
 
@@ -54,6 +56,13 @@ export class Hiscores {
 
   board(board: BoardId): Promise<BoardResponse> {
     return request<BoardResponse>(`/api/hiscores?board=${board}&player=${playerId()}`);
+  }
+
+  /** A co-op board. The co-op server posts party runs itself. */
+  teamBoard(board: BoardId, size: TeamSize): Promise<TeamBoardResponse> {
+    return request<TeamBoardResponse>(
+      `/api/hiscores?board=${board}&size=${size}&player=${playerId()}`,
+    );
   }
 
   private fresh(): boolean {

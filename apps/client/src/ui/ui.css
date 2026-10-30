@@ -615,6 +615,10 @@ button.card:hover {
   margin: 6px 0 12px;
 }
 
+.tabs + .tabs {
+  margin-top: -4px;
+}
+
 .tabs [aria-selected='true'] {
   border-color: var(--gold);
   color: var(--gold);
@@ -647,6 +651,16 @@ table.hiscores {
 
 .hiscores .name {
   overflow-wrap: anywhere;
+}
+
+/* A team's players sit side by side and wrap a whole name at a time. */
+.hiscores .member {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.hiscores .member:last-child {
+  margin-right: 0;
 }
 
 .hiscores tr.you td {

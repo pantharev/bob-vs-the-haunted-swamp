@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MemoryStore, type Store } from '../server/store';
-import { upstashFromEnv } from '../server/upstash';
+import { MemoryStore, type Store } from '../src/store';
+import { upstashFromEnv } from '../src/upstash';
 import { startFakeUpstash } from './fake-upstash';
 
 let fake: Awaited<ReturnType<typeof startFakeUpstash>>;

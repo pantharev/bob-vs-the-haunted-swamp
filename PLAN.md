@@ -1,6 +1,6 @@
 # Survivors-like: Bob vs. the Haunted Swamp — Game Plan
 
-> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a passed in Chromium, Firefox, WebKit and on an Android phone; 5b (party scaling and revives) is built; 5c (server and lobby) is live on Railway since 2026-10-30, and 5d (co-op feel) is built. Working title is TBD.
+> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a passed in Chromium, Firefox, WebKit and on an Android phone; 5b (party scaling and revives) is built; 5c (server and lobby) and 5d (co-op feel) are live on Railway since 2026-10-30, and 5e (co-op hiscores) is built. Working title is TBD.
 > **Decided 2026-10-27:** inspired-by naming (no RuneScape names in the game) · PixiJS + own sim · art via GPT Image.
 > Library versions below were checked on npm today. Art is generated with GPT Image through the user's ChatGPT subscription (§6).
 
@@ -481,6 +481,12 @@ This replaces the earlier snapshot plan. That plan rejected lockstep because cro
   - Two-browser checks still pass (hashes at frames 299–1499 identical, reload rejoin, host hand-over). The new flow test covers the strip, identical results tables on both browsers, and the way back to the lobby.
   - Reconnect fast-forward, Leave and host hand-over were already done in 5c.
 - **5e Co-op hiscores (small).** Duo, Trio and Squad boards, weekly and all time.
+  - **2026-10-30: built.** The store, key scheme and board shapes moved into a new shared package, `packages/hiscores` (`@game/hiscores`); Upstash sits behind its own entry, `@game/hiscores/upstash`, so browsers never load it. Solo keys are unchanged (`bob:s1:all`, `bob:s1:week:<week>`); party boards are `bob:s1:party<N>:all` and `bob:s1:party<N>:week:<week>`.
+  - The co-op server records a party run itself when it ends (`Room.finish`), since it played every frame: no tickets, no replays. It then sends the party a `ranked` message (placing, or why it couldn't post). Parties of 1 aren't ranked.
+  - A team is its players' anonymous hiscores ids, sorted, so the same friends keep one best run whatever the seats. Browsers send the id when they create or join a room; it stays on the server and is never sent to other players.
+  - `/api/hiscores` takes `size=2|3|4` for the party boards and marks the teams the asking player was on. The hiscores page has Solo, Duo, Trio and Squad tabs, and opens on your party's board from the co-op results.
+  - Railway needs the same Upstash REST credentials as Vercel (`KV_REST_API_URL`, `KV_REST_API_TOKEN`); without them the results say co-op hiscores aren't set up. Dev without them uses an in-memory store.
+  - Checked with two browsers against a fake Upstash shared by the dev co-op server and the dev API: both saw "Duo hiscores: #1 this week · #1 all time", and the Duo board listed the team, highlighted, on desktop and phone.
 - **5f Rollback (medium, only if needed).** Instant local movement if the input delay feels bad over 4G.
 - **Done when:** four phones on different networks (one on 4G) finish a run together with no desyncs, and it takes under 30 s from tapping an invite link to the first wave.
 

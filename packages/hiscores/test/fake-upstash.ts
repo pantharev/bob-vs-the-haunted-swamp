@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 
 /**
  * Just enough of Upstash's REST API (POST / and POST /pipeline, Redis replies
- * as raw JSON) to run the commands server/upstash.ts sends, with Redis's own
+ * as raw JSON) to run the commands src/upstash.ts sends, with Redis's own
  * reply shapes: scores come back as strings, missing values as null.
  */
 export async function startFakeUpstash(): Promise<{

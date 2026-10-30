@@ -1,9 +1,22 @@
 import type { WeaponId } from '@game/content';
+import type { BoardId, BoardPlacing } from '@game/hiscores';
 import type { Replay } from '@game/sim';
 
 /** Request and response shapes shared by the hiscores client and the API in ../../server. */
 
-export type BoardId = 'week' | 'all';
+// Board ids, placings and the co-op boards' shapes are shared with the co-op server.
+export {
+  isTeamSize,
+  PARTY_BOARD_NAMES,
+  PARTY_SIZES,
+  PLAYER_ID_PATTERN,
+  type BoardId,
+  type BoardPlacing,
+  type PartySize,
+  type TeamBoardResponse,
+  type TeamEntry,
+  type TeamSize,
+} from '@game/hiscores';
 
 export interface TicketRequest {
   readonly player: string;
@@ -24,14 +37,6 @@ export interface RunSubmission {
   /** What the client scored; the server re-runs the replay and must get the same. */
   readonly score: number;
   readonly replay: Replay;
-}
-
-export interface BoardPlacing {
-  /** 1-based. */
-  readonly rank: number;
-  /** The player's best score on this board (this run or an earlier one). */
-  readonly best: number;
-  readonly improved: boolean;
 }
 
 export interface SubmitResponse {
@@ -71,4 +76,3 @@ export interface ApiError {
 
 // Name rules are shared with the co-op lobby.
 export { NAME_MAX, NAME_PATTERN } from '@game/coop';
-export const PLAYER_ID_PATTERN = /^[0-9a-f]{32}$/;

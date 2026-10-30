@@ -12,8 +12,8 @@
   "dependencies": {
     "@game/content": "*",
     "@game/coop": "*",
+    "@game/hiscores": "*",
     "@game/sim": "*",
-    "@upstash/redis": "^1.40.0",
     "pixi.js": "^8.22.0",
     "preact": "^11.1.0",
     "socket.io-client": "^4.8.4",

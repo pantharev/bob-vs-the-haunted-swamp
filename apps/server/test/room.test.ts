@@ -8,10 +8,12 @@ import {
   type Lobby,
   type RunStart,
   type ServerToClient,
+  type TeamRanked,
 } from '@game/coop';
+import { MemoryStore, readTeamBoard, recordTeam } from '@game/hiscores';
 import { worldHash, type World } from '@game/sim';
-import { describe, expect, it } from 'vitest';
-import { Room, type Outbox } from '../src/room';
+import { describe, expect, it, vi } from 'vitest';
+import { Room, type Outbox, type RecordTeam } from '../src/room';
 import { roomCode, Rooms } from '../src/rooms';
 
 /** A browser stand-in: keeps its own world from the messages it gets, like the real client. */
@@ -19,6 +21,7 @@ class Client {
   world: World | null = null;
   frame = 0;
   lobby: Lobby | null = null;
+  ranked: TeamRanked | null = null;
   resyncs = 0;
   readonly log: string[] = [];
   constructor(readonly socket: string) {}
@@ -26,6 +29,7 @@ class Client {
   receive<E extends keyof ServerToClient>(event: E, args: Parameters<ServerToClient[E]>): void {
     this.log.push(event);
     if (event === 'lobby') this.lobby = args[0] as Lobby;
+    if (event === 'ranked') this.ranked = args[0] as TeamRanked;
     if (event === 'start' || event === 'resync') {
       if (event === 'resync') this.resyncs++;
       const s = args[0] as RunStart;
@@ -46,22 +50,40 @@ class Client {
   }
 }
 
-function setup() {
+function setup(record: RecordTeam | null = null) {
   const clients = new Map<string, Client>();
   const members = new Set<string>();
+  /** Everything sent, as JSON. */
+  const wire: string[] = [];
   const out: Outbox = {
     all: (event, ...args) => {
+      wire.push(JSON.stringify([event, args]));
       for (const s of members) clients.get(s)!.receive(event, args);
     },
-    one: (socket, event, ...args) => clients.get(socket)?.receive(event, args),
+    one: (socket, event, ...args) => {
+      wire.push(JSON.stringify([event, args]));
+      clients.get(socket)?.receive(event, args);
+    },
   };
   let n = 0;
-  const room = new Room('ABCDEF', out, { seed: () => 12345, token: () => `token-${++n}` });
+  const room = new Room(
+    'ABCDEF',
+    out,
+    { seed: () => 12345, token: () => `token-${++n}` },
+    () => {},
+    record,
+  );
   let clock = 0;
-  const join = (socket: string, name = socket, weapon = 'dagger', token?: string): JoinResult => {
+  const join = (
+    socket: string,
+    name = socket,
+    weapon = 'dagger',
+    token?: string,
+    player?: string,
+  ): JoinResult => {
     if (!clients.has(socket)) clients.set(socket, new Client(socket));
     members.add(socket);
-    const r = room.join(socket, { name, weapon, token }, clock);
+    const r = room.join(socket, { name, weapon, token, player }, clock);
     if (!r.ok) members.delete(socket);
     return r;
   };
@@ -79,6 +101,7 @@ function setup() {
   return {
     room,
     clients,
+    wire,
     join,
     drop,
     run,
@@ -252,17 +275,96 @@ describe('lockstep', () => {
   it('goes back to the lobby when the run ends, everyone un-readied', () => {
     const t = startWith('a', 'b');
     t.run(1000);
-    for (const p of t.room.world!.players) {
-      p.alive = false;
-      p.hp = 0;
-    }
-    // The clients' copies have to match for the frame that ends it.
-    for (const s of ['a', 'b'])
-      for (const p of t.client(s).world!.players) Object.assign(p, { alive: false, hp: 0 });
-    t.run(100);
+    wipe(t, ['a', 'b']);
     expect(t.room.phase).toBe('lobby');
     expect(t.client('a').world!.phase).toBe('over');
     expect(t.room.lobby().members.every((m) => !m.ready)).toBe(true);
+  });
+});
+
+/** Downs the whole party on the server and every client, so the next frame ends the run. */
+function wipe(t: ReturnType<typeof setup>, sockets: readonly string[]): void {
+  const down = (world: World) => {
+    for (const p of world.players) Object.assign(p, { alive: false, hp: 0 });
+  };
+  down(t.room.world!);
+  // The clients' copies have to match for the frame that ends it.
+  for (const s of sockets) down(t.client(s).world!);
+  t.run(100);
+}
+
+describe('hiscores', () => {
+  const NOW = Date.UTC(2026, 9, 30, 12);
+  const ANN = 'a'.repeat(32);
+
+  function party(record: RecordTeam | null, players: [string, string?][]) {
+    const t = setup(record);
+    for (const [socket, id] of players)
+      t.join(socket, socket.toUpperCase(), 'staff', undefined, id);
+    for (const [socket] of players) t.room.update(socket, { ready: true });
+    t.room.start(players[0]![0], t.now());
+    t.run(1000);
+    return t;
+  }
+
+  it("puts a party's finished run on its board, under the players' ids", async () => {
+    const store = new MemoryStore(() => NOW);
+    const t = party(
+      (players, run) => recordTeam(store, players, run, NOW),
+      [
+        ['ann', ANN],
+        ['bo', 'not-an-id'],
+      ],
+    );
+    const score = t.room.world!.stats.score;
+    wipe(t, ['ann', 'bo']);
+    await vi.waitFor(() => expect(t.client('bo').ranked).not.toBeNull());
+    expect(t.client('ann').ranked).toEqual({
+      seed: 12345,
+      ok: true,
+      week: { rank: 1, best: score, improved: true },
+      all: { rank: 1, best: score, improved: true },
+    });
+    const board = await readTeamBoard(store, 'all', 2, ANN, NOW);
+    expect(board.entries).toHaveLength(1);
+    expect(board.entries[0]).toMatchObject({
+      team: [
+        { name: 'ANN', weapon: 'staff' },
+        { name: 'BO', weapon: 'staff' },
+      ],
+      score,
+      won: false,
+      you: true,
+    });
+    // Ids stay on the server.
+    expect(t.wire.some((m) => m.includes(ANN))).toBe(false);
+  });
+
+  it('tells the party when the hiscores are missing or fail', async () => {
+    const none = party(null, [['ann'], ['bo']]);
+    wipe(none, ['ann', 'bo']);
+    await vi.waitFor(() => expect(none.client('ann').ranked).not.toBeNull());
+    expect(none.client('ann').ranked).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/not set up/),
+    });
+
+    const broken = party(() => Promise.reject(new Error('redis down')), [['ann'], ['bo']]);
+    wipe(broken, ['ann', 'bo']);
+    await vi.waitFor(() => expect(broken.client('bo').ranked).not.toBeNull());
+    expect(broken.client('bo').ranked).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/wasn't posted/),
+    });
+  });
+
+  it("doesn't rank a party of one", async () => {
+    const record = vi.fn<RecordTeam>();
+    const t = party(record, [['ann', ANN]]);
+    wipe(t, ['ann']);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(record).not.toHaveBeenCalled();
+    expect(t.client('ann').log).not.toContain('ranked');
   });
 });
 

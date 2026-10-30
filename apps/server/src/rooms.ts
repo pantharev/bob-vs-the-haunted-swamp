@@ -1,5 +1,5 @@
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, type JoinResult } from '@game/coop';
-import { Room, type Outbox, type Randomness } from './room';
+import { Room, type Outbox, type Randomness, type RecordTeam } from './room';
 
 /** A browser on other rules than this server would drift out of lockstep. */
 const OUTDATED: JoinResult = {
@@ -18,6 +18,8 @@ export class Rooms {
     /** This server's rules hash. */
     private readonly rules: string,
     private readonly log: (message: string) => void = () => {},
+    /** Puts party runs on the hiscores; null when this server has none. */
+    private readonly record: RecordTeam | null = null,
   ) {}
 
   get size(): number {
@@ -26,14 +28,14 @@ export class Rooms {
 
   create(
     socket: string,
-    p: { name: unknown; weapon: unknown; rules?: unknown },
+    p: { name: unknown; weapon: unknown; rules?: unknown; player?: unknown },
     now: number,
   ): JoinResult {
     if (p.rules !== this.rules) return OUTDATED;
     this.leaveAny(socket, now);
     let code = this.random.code();
     for (let guard = 0; this.rooms.has(code) && guard < 100; guard++) code = this.random.code();
-    const room = new Room(code, this.outbox(code), this.random, this.log);
+    const room = new Room(code, this.outbox(code), this.random, this.log, this.record);
     const joined = room.join(socket, p, now);
     if (joined.ok) {
       this.rooms.set(code, room);
@@ -45,7 +47,14 @@ export class Rooms {
 
   join(
     socket: string,
-    p: { code: unknown; name: unknown; weapon: unknown; rules?: unknown; token?: unknown },
+    p: {
+      code: unknown;
+      name: unknown;
+      weapon: unknown;
+      rules?: unknown;
+      player?: unknown;
+      token?: unknown;
+    },
     now: number,
   ): JoinResult {
     if (p.rules !== this.rules) return OUTDATED;

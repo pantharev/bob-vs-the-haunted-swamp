@@ -1,4 +1,5 @@
 import type { WeaponId } from '@game/content';
+import type { TeamPlacing } from '@game/hiscores';
 import type { RunAction } from '@game/sim';
 
 /**
@@ -66,16 +67,34 @@ export interface RunStart {
   readonly frames: readonly Frame[];
 }
 
+/** Where a finished run placed on the Duo, Trio or Squad hiscores. `seed` says which run. */
+export type TeamRanked =
+  | ({ readonly seed: number; readonly ok: true } & TeamPlacing)
+  | { readonly seed: number; readonly ok: false; readonly error: string };
+
 export type JoinResult =
   | { readonly ok: true; readonly seat: number; readonly token: string; readonly lobby: Lobby }
   | { readonly ok: false; readonly error: string };
 
 export interface ClientToServer {
-  /** `rules` is the build's rules hash: the server only seats browsers running the same rules. */
-  create(p: { name: string; weapon: WeaponId; rules: string }, ack: (r: JoinResult) => void): void;
+  /**
+   * `rules` is the build's rules hash: the server only seats browsers running the same rules.
+   * `player` is the browser's anonymous hiscores id, so a team keeps one best run on its board.
+   */
+  create(
+    p: { name: string; weapon: WeaponId; rules: string; player?: string },
+    ack: (r: JoinResult) => void,
+  ): void;
   /** `token` rejoins the seat it was issued for (reloads, dropped connections). */
   join(
-    p: { code: string; name: string; weapon: WeaponId; rules: string; token?: string },
+    p: {
+      code: string;
+      name: string;
+      weapon: WeaponId;
+      rules: string;
+      player?: string;
+      token?: string;
+    },
     ack: (r: JoinResult) => void,
   ): void;
   /** Lobby changes to your own seat. */
@@ -97,6 +116,8 @@ export interface ServerToClient {
   frames(from: number, frames: readonly Frame[]): void;
   /** Your world drifted: rebuild it from this. */
   resync(s: RunStart): void;
+  /** A finished party run went on the hiscores (or couldn't). Not sent for a party of 1. */
+  ranked(r: TeamRanked): void;
   /** Kicked out (room closed, server restarting). */
   closed(reason: string): void;
 }

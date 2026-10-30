@@ -14,6 +14,17 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '0.8',
+    date: '2026-10-30',
+    title: 'Co-op hiscores',
+    notes: [
+      'Duo, Trio and Squad hiscores, this week and all time, next to the solo boards.',
+      'Every party run goes on the board for its size by itself: the co-op server plays the whole run, so it already knows the score. The results screen shows where you placed.',
+      'Each team (the same players, whatever the seats) keeps its best run, and the teams you played on are highlighted.',
+      'A Hiscores button on the co-op results opens your party’s board.',
+    ],
+  },
+  {
     version: '0.7',
     date: '2026-10-30',
     title: 'Co-op polish',

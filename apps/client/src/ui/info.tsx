@@ -137,6 +137,10 @@ export function HelpScreen({ onBack }: { onBack: () => void }) {
           At 0 HP you&apos;re down, not out: a teammate standing next to you for {REVIVE.seconds}{' '}
           seconds gets you back up. Anyone still down when a wave ends returns for the next one.
         </li>
+        <li>
+          Parties of 2, 3 and 4 have their own hiscores: Duo, Trio and Squad. Every party run goes
+          on them by itself, and each team keeps its best.
+        </li>
       </ul>
 
       <h2>Score and hiscores</h2>

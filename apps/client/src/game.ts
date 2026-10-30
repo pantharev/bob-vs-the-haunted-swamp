@@ -7,6 +7,7 @@ import {
   toSteps,
   type Frame,
   type RunStart,
+  type TeamRanked,
 } from '@game/coop';
 import {
   applyAction,
@@ -68,10 +69,13 @@ export type CoopEntry =
 
 /** A co-op run in progress: frames from the server waiting to be played, and how many were. */
 interface NetRun {
+  readonly seed: number;
   readonly queue: Frame[];
   applied: number;
   /** Frame the current intermission opened at, for the shop timer. */
   intermissionSince: number | null;
+  /** Where the finished run placed on the party hiscores, once the server says. */
+  ranked: TeamRanked | null;
 }
 
 /** Frames kept in hand against network jitter; more than this means we're behind and catch up. */
@@ -167,7 +171,7 @@ export class Game {
       me,
     };
     this.world = startWorld(start);
-    this.net = { queue: [], applied: 0, intermissionSince: null };
+    this.net = { seed: start.seed, queue: [], applied: 0, intermissionSince: null, ranked: null };
     // A rejoin or resync catches up silently on the frames already played.
     for (const frame of start.frames) this.playFrame(frame, false);
     this.view.focus = me;
@@ -190,6 +194,18 @@ export class Game {
     // Anything before `expected` we already have (it came with a resync).
     if (from + frames.length <= expected || from > expected) return;
     net.queue.push(...frames.slice(expected - from));
+  }
+
+  /** The server put this party's finished run on the hiscores (or couldn't). */
+  teamRanked(ranked: TeamRanked): void {
+    if (this.net?.seed !== ranked.seed) return;
+    this.net.ranked = ranked;
+    this.notify();
+  }
+
+  /** Where the finished co-op run placed; null until the server says (or for a party of 1). */
+  get teamPlacing(): TeamRanked | null {
+    return this.net?.ranked ?? null;
   }
 
   /** Seconds left before the server readies anyone still shopping, in co-op. */

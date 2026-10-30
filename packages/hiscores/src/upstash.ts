@@ -6,9 +6,7 @@ import { detailsKey, type BoardRecord, type BoardRow, type Placing, type Store }
  * integration adds (KV_REST_API_*), or Upstash's own names. Returns null
  * when neither is set, and the API then answers 503.
  */
-export function upstashFromEnv(
-  env: Record<string, string | undefined> = process.env,
-): Store | null {
+export function upstashFromEnv(env: Record<string, string | undefined>): Store | null {
   const url = env.UPSTASH_REDIS_REST_URL ?? env.KV_REST_API_URL;
   const token = env.UPSTASH_REDIS_REST_TOKEN ?? env.KV_REST_API_TOKEN;
   if (!url || !token) return null;
