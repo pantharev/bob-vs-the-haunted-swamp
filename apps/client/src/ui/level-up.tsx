@@ -2,28 +2,38 @@ import { RARITY_NAMES, SKILLS } from '@game/content';
 import type { Player } from '@game/sim';
 import type { Game } from '../game';
 import { useHotkeys } from './app';
+import { PartyStrip } from './coop';
 import { SKILL_ICONS, skillEffects } from './format';
 
 export function LevelUpScreen({ game, player }: { game: Game; player: Player }) {
   const choose = (index: number) => game.act({ type: 'chooseUpgrade', index });
-  useHotkeys((code) => {
-    const n = Number(code.replace(/^(Digit|Numpad)/, ''));
-    if (n >= 1 && n <= player.upgrades.length) {
-      choose(n - 1);
-      return true;
-    }
-  }, [player.upgrades]);
+  useHotkeys(
+    (code) => {
+      const n = Number(code.replace(/^(Digit|Numpad)/, ''));
+      if (n >= 1 && n <= player.upgrades.length) {
+        choose(n - 1);
+        return true;
+      }
+    },
+    [player.upgrades],
+  );
 
   return (
     <div class="screen enter">
       <div class="panel">
+        <PartyStrip game={game} />
         <h1>Level up!</h1>
         <p class="sub">
-          Level {player.level} · {player.pendingLevels} pick{player.pendingLevels === 1 ? '' : 's'} left
+          Level {player.level} · {player.pendingLevels} pick{player.pendingLevels === 1 ? '' : 's'}{' '}
+          left
         </p>
         <div class="cards">
           {player.upgrades.map((u, i) => (
-            <button key={`${u.skill}-${i}`} class={`card rarity-${u.rarity}`} onClick={() => choose(i)}>
+            <button
+              key={`${u.skill}-${i}`}
+              class={`card rarity-${u.rarity}`}
+              onClick={() => choose(i)}
+            >
               <span class="key">{i + 1}</span>
               <span class="icon">{SKILL_ICONS[u.skill]}</span>
               <span class="name">

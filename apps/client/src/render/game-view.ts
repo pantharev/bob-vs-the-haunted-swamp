@@ -1,6 +1,7 @@
 import { WEAPONS, type EnemyId, type WeaponId } from '@game/content';
-import type { SimEvent, World } from '@game/sim';
+import type { Player, SimEvent, World } from '@game/sim';
 import { Container, Sprite, type Application, type Texture } from 'pixi.js';
+import type { Party } from '../coop/party';
 import type { Input } from '../input/input';
 import type { Art } from './art';
 import { createArenaView } from './arena-view';
@@ -10,6 +11,7 @@ import { EnemyView } from './enemy-view';
 import { CHEST_HEIGHT, Fx } from './fx';
 import { Hud } from './hud';
 import { JoystickView } from './joystick-view';
+import { PartyView } from './party-view';
 import { PlayerView } from './player-view';
 
 /** Particle colour per enemy kind, for death bursts. */
@@ -36,6 +38,8 @@ export class GameView {
   hudVisible = true;
   /** The player the camera follows and the HUD describes: you. */
   focus = 0;
+  /** In a party, the camera follows a standing teammate while you're down. */
+  private spectate = false;
   private readonly worldLayer = new Container();
   private readonly groundFx = new Container();
   private readonly entityLayer = new Container({ sortableChildren: true });
@@ -45,6 +49,7 @@ export class GameView {
   private readonly barsLayer = new Container();
   private readonly fx: Fx;
   private readonly hud: Hud;
+  private readonly partyView = new PartyView();
   private readonly joystickView = new JoystickView();
   private readonly gooSprites: Sprite[] = [];
   private readonly markerSprites: Sprite[] = [];
@@ -65,14 +70,34 @@ export class GameView {
   ) {
     this.fx = new Fx(art);
     this.hud = new Hud(art);
-    this.worldLayer.addChild(this.groundFx, this.entityLayer, this.airLayer, this.fx.world);
-    this.overlayWorld.addChild(this.barsLayer, this.fx.overlay);
-    app.stage.addChild(this.worldLayer, this.overlayWorld, this.hud.root, this.joystickView.root);
+    this.worldLayer.addChild(
+      this.groundFx,
+      this.partyView.ground,
+      this.entityLayer,
+      this.airLayer,
+      this.fx.world,
+    );
+    this.overlayWorld.addChild(this.barsLayer, this.partyView.overlay, this.fx.overlay);
+    app.stage.addChild(
+      this.worldLayer,
+      this.overlayWorld,
+      this.partyView.screen,
+      this.hud.root,
+      this.joystickView.root,
+    );
+  }
+
+  /** Names and colours for a multi-player run (call after setWorld); null for solo. */
+  setParty(party: Party | null): void {
+    if (this.world) this.partyView.setParty(this.world, party);
+    this.spectate = party !== null;
   }
 
   /** Points the view at a new run: rebuilds the seed-dependent arena and mood. */
   setWorld(world: World): void {
     this.world = world;
+    this.partyView.setParty(world, null);
+    this.spectate = false;
     this.arena?.destroy({ children: true, texture: true, textureSource: true });
     this.atmosphere?.root.destroy({ children: true, texture: true, textureSource: true });
 
@@ -196,8 +221,9 @@ export class GameView {
 
     const focus = world.players[this.focus];
     if (!focus) return;
-    const fx = focus.prevX + (focus.x - focus.prevX) * alpha;
-    const fy = focus.prevY + (focus.y - focus.prevY) * alpha;
+    const target = this.cameraTarget(world, focus);
+    const fx = target.prevX + (target.x - target.prevX) * alpha;
+    const fy = target.prevY + (target.y - target.prevY) * alpha;
 
     const cam = this.camera;
     cam.update(fx, fy, width, height, dt, world.arena);
@@ -209,11 +235,28 @@ export class GameView {
       );
     }
 
+    this.partyView.update(world, alpha, cam, width, height, dt);
     const lanterns = focus.items['lantern'] ?? 0;
     this.atmosphere?.update(cam, fx, fy, width, height, dt, 1 + lanterns * 0.15);
     this.hud.root.visible = this.hudVisible && world.phase === 'wave';
     if (this.hud.root.visible) this.hud.update(world, focus, width, height);
     this.joystickView.update(input.joystick);
+  }
+
+  /** You, or while you're down in a party, the standing teammate nearest your body. */
+  private cameraTarget(world: World, focus: Player): Player {
+    if (!this.spectate || focus.alive) return focus;
+    let best: Player | null = null;
+    let bestD2 = Infinity;
+    for (const p of world.players) {
+      if (!p.alive) continue;
+      const d2 = (p.x - focus.x) ** 2 + (p.y - focus.y) ** 2;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = p;
+      }
+    }
+    return best ?? focus;
   }
 
   private syncEnemies(world: World, alpha: number, dt: number): void {

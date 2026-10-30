@@ -1,8 +1,9 @@
 import { COOP_SCALING, ENEMIES, REVIVE, ZONES } from '@game/content';
 import { describe, expect, it } from 'vitest';
-import { applyAction, createWorld, NEUTRAL_INPUT, step, type World } from '../src';
+import { applyAction, createWorld, NEUTRAL_INPUT, quantizeInput, step, type World } from '../src';
 import { seconds } from '../src/constants';
-import { spawnEnemy } from '../src/combat';
+import { hurtPlayer, spawnEnemy } from '../src/combat';
+import { botInput } from './bot';
 
 const zone = ZONES.wolfmoor;
 
@@ -123,5 +124,32 @@ describe('downed and revived', () => {
     step(world, idle(world));
     expect(world.outcome).toBe('defeat');
     expect(world.players[0]!.revive).toBe(0);
+  });
+});
+
+describe('per-player stats', () => {
+  it("add up to the run's totals", () => {
+    const world = createWorld({ seed: 3, zone, loadouts: [['staff'], ['boomchin'], ['shortbow']] });
+    for (let t = 0; t < seconds(40) && world.phase === 'wave'; t++) {
+      step(
+        world,
+        world.players.map((p) => quantizeInput(botInput(world, p))),
+      );
+    }
+    const sum = (f: (p: World['players'][number]) => number) =>
+      world.players.reduce((a, p) => a + f(p), 0);
+    expect(world.stats.kills).toBeGreaterThan(0);
+    expect(sum((p) => p.kills)).toBe(world.stats.kills);
+    expect(sum((p) => p.damage)).toBe(world.stats.damageDealt);
+  });
+
+  it('counts each time a player goes down', () => {
+    const world = party(2);
+    const p = world.players[1]!;
+    p.invulnerable = 0;
+    p.hp = 1;
+    hurtPlayer(world, p, 50);
+    expect(p.alive).toBe(false);
+    expect(p.downs).toBe(1);
   });
 });

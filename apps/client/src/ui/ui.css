@@ -418,6 +418,10 @@ button.card:hover {
 
 /* ---------------------------------------------------------------- results */
 
+.summary[hidden] {
+  display: none;
+}
+
 .summary {
   display: grid;
   grid-template-columns: auto auto;
@@ -778,4 +782,95 @@ table.hiscores {
 .weapon-picks button.selected {
   border-color: var(--gold);
   color: var(--gold);
+}
+
+.party-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  margin: -4px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.25);
+  font-size: 13px;
+}
+
+.party-strip .member {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.party-strip .member small {
+  color: var(--muted);
+}
+
+.party-strip .member.ready small {
+  color: var(--good);
+  font-weight: bold;
+}
+
+.party-strip .timer {
+  margin-left: auto;
+  color: var(--gold);
+}
+
+.party-strip .dot,
+.party-results .dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 0.5);
+}
+
+table.party-results {
+  width: 100%;
+  margin: 14px 0 0;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+
+.party-results th {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--edge);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.party-results td {
+  padding: 6px;
+  border-bottom: 1px solid rgb(77 60 38 / 0.45);
+}
+
+.party-results .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.party-results tr.you td {
+  background: rgb(242 193 78 / 0.1);
+}
+
+.party-results .weapon {
+  margin-left: 4px;
+  font-size: 12px;
+}
+
+.net-banner {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 30;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border: 2px solid var(--danger);
+  border-radius: 8px;
+  background: rgb(23 19 14 / 0.92);
+  color: var(--danger);
+  font-weight: bold;
 }

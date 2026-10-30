@@ -41,6 +41,9 @@ function App({ game }: { game: Game }) {
 
   switch (world.phase) {
     case 'wave':
+      if (game.coop?.reconnecting && game.isCoop) {
+        return <div class="net-banner">Connection lost. Reconnecting…</div>;
+      }
       return game.paused ? (
         <PauseScreen game={game} />
       ) : (

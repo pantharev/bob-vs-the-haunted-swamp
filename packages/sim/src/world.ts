@@ -88,6 +88,11 @@ export interface Player {
   shop: ShopOffer[];
   /** Rerolls bought in the current shop. */
   rerolls: number;
+  /** This player's own share of the run, for co-op results. */
+  kills: number;
+  damage: number;
+  /** Times this player went down (died, in solo). */
+  downs: number;
 }
 
 export type EnemyAction = 'walk' | 'telegraph' | 'lunge';
@@ -279,6 +284,9 @@ export function createPlayer(
     upgrades: [],
     shop: [],
     rerolls: 0,
+    kills: 0,
+    damage: 0,
+    downs: 0,
   };
 }
 

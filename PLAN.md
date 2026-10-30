@@ -1,6 +1,6 @@
 # Survivors-like: Bob vs. the Haunted Swamp — Game Plan
 
-> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a passed in Chromium, Firefox, WebKit and on an Android phone; 5b (party scaling and revives) is built; 5c (server and lobby) is built and tested locally, waiting on the Railway deploy. Working title is TBD.
+> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a passed in Chromium, Firefox, WebKit and on an Android phone; 5b (party scaling and revives) is built; 5c (server and lobby) is live on Railway since 2026-10-30, and 5d (co-op feel) is built. Working title is TBD.
 > **Decided 2026-10-27:** inspired-by naming (no RuneScape names in the game) · PixiJS + own sim · art via GPT Image.
 > Library versions below were checked on npm today. Art is generated with GPT Image through the user's ChatGPT subscription (§6).
 
@@ -474,6 +474,12 @@ This replaces the earlier snapshot plan. That plan rejected lockstep because cro
   - Production mode accepts only `ALLOWED_ORIGINS` (checked on the WebSocket itself). `/health` serves Railway. The build is `apps/server/dist/server.mjs` (75 kB; socket.io stays in node_modules).
   - **To go live:** a Railway service from the GitHub repo. Build `npm run build -w @game/server`, start `npm run start -w @game/server`, healthcheck `/health`, variable `ALLOWED_ORIGINS` = the Vercel URL, then a generated domain. Then set `VITE_COOP_URL` on Vercel to that domain and redeploy. Until then, "Play with friends" stays hidden in production.
 - **5d Co-op feel (medium).** Colours, name tags, teammate HP, off-screen arrows, the spectator camera, the ready timer, reconnect fast-forward, Leave and host hand-over.
+  - **2026-10-30: built.** `render/party-view.ts` adds coloured rings under every Bob, name tags with HP over teammates (in the layer above the fog), a revive ring that fills while someone stands on a downed player, edge arrows to teammates out of view (blinking red when they're down), and a "YOU'RE DOWN" banner with your revive bar.
+  - While you're down, the camera follows the standing teammate nearest your body.
+  - The sim tracks `kills`, `damage` and `downs` per player. The co-op results show them in a table and drop the solo summary. The shop and level-up screens get a party strip (who's ready, shopping or levelling up, plus the shop countdown), and a "Reconnecting…" notice shows during a run.
+  - Colours follow lobby seats (`coop/party.ts`), so every browser shows the same colour for the same friend. `?bots` parties get them too.
+  - Two-browser checks still pass (hashes at frames 299–1499 identical, reload rejoin, host hand-over). The new flow test covers the strip, identical results tables on both browsers, and the way back to the lobby.
+  - Reconnect fast-forward, Leave and host hand-over were already done in 5c.
 - **5e Co-op hiscores (small).** Duo, Trio and Squad boards, weekly and all time.
 - **5f Rollback (medium, only if needed).** Instant local movement if the input delay feels bad over 4G.
 - **Done when:** four phones on different networks (one on 4G) finish a run together with no desyncs, and it takes under 30 s from tapping an invite link to the first wave.

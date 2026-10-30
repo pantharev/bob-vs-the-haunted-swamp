@@ -1,7 +1,17 @@
-import { ITEMS_BY_ID, MAX_WEAPONS, RARITY_NAMES, SKILL_IDS, SKILLS, STATS, WEAPONS, type StatKey } from '@game/content';
+import {
+  ITEMS_BY_ID,
+  MAX_WEAPONS,
+  RARITY_NAMES,
+  SKILL_IDS,
+  SKILLS,
+  STATS,
+  WEAPONS,
+  type StatKey,
+} from '@game/content';
 import { buyBlocker, rerollPrice, sellPrice, type Player } from '@game/sim';
 import type { Game } from '../game';
 import { useHotkeys } from './app';
+import { PartyStrip } from './coop';
 import { formatStat, itemIcon, offerInfo, WEAPON_ICONS } from './format';
 
 const BLOCKER_TEXT = { sold: 'Sold', coins: 'Not enough gp', slots: 'Weapon slots full' } as const;
@@ -10,20 +20,24 @@ export function ShopScreen({ game, player }: { game: Game; player: Player }) {
   const { world } = game;
   const reroll = rerollPrice(world, player);
   const next = () => game.act({ type: 'ready' });
-  useHotkeys((code) => {
-    if (code === 'KeyR') {
-      game.act({ type: 'reroll' });
-      return true;
-    }
-    if (code === 'Enter') {
-      next();
-      return true;
-    }
-  }, [player]);
+  useHotkeys(
+    (code) => {
+      if (code === 'KeyR') {
+        game.act({ type: 'reroll' });
+        return true;
+      }
+      if (code === 'Enter') {
+        next();
+        return true;
+      }
+    },
+    [player],
+  );
 
   return (
     <div class="screen enter">
       <div class="panel wide">
+        <PartyStrip game={game} />
         <header class="shop-head">
           <div>
             <h1>Shop</h1>
@@ -41,7 +55,10 @@ export function ShopScreen({ game, player }: { game: Game; player: Player }) {
             const info = offerInfo(offer);
             const blocker = buyBlocker(player, offer);
             return (
-              <div key={`${offer.id}-${i}`} class={`card offer rarity-${offer.rarity} ${offer.sold ? 'sold' : ''}`}>
+              <div
+                key={`${offer.id}-${i}`}
+                class={`card offer rarity-${offer.rarity} ${offer.sold ? 'sold' : ''}`}
+              >
                 <span class="icon">{info.icon}</span>
                 <span class="name">{info.name}</span>
                 <span class="rarity">
@@ -58,7 +75,9 @@ export function ShopScreen({ game, player }: { game: Game; player: Player }) {
                     class="lock"
                     aria-pressed={offer.locked}
                     aria-label={offer.locked ? 'Unlock' : 'Lock for next shop'}
-                    title={offer.locked ? 'Locked: stays for the next shop' : 'Lock for the next shop'}
+                    title={
+                      offer.locked ? 'Locked: stays for the next shop' : 'Lock for the next shop'
+                    }
                     disabled={offer.sold}
                     onClick={() => game.act({ type: 'toggleLock', index: i })}
                   >
@@ -141,7 +160,9 @@ function Items({ player }: { player: Player }) {
 }
 
 function Stats({ player }: { player: Player }) {
-  const shown = (Object.keys(STATS) as StatKey[]).filter((k) => k !== 'maxHp' && player.stats[k] !== 0);
+  const shown = (Object.keys(STATS) as StatKey[]).filter(
+    (k) => k !== 'maxHp' && player.stats[k] !== 0,
+  );
   return (
     <details class="stats">
       <summary>

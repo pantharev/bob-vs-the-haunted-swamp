@@ -26,6 +26,7 @@ import type { GameAudio } from './audio/audio';
 import type { MusicScene } from './audio/music';
 import type { UiSound } from './audio/sfx-bank';
 import { Coop } from './coop/coop';
+import { SEAT_COLORS, type Party } from './coop/party';
 import type { DebugOverlay } from './debug/overlay';
 import { HiscoreError, Hiscores } from './hiscores/client';
 import type { SubmitResponse } from './hiscores/protocol';
@@ -100,8 +101,8 @@ export class Game {
   coopEntry: CoopEntry | null = null;
   /** Which of the world's players is you: 0 except in co-op. */
   localPlayer = 0;
-  /** Co-op: each player's name, in player order. */
-  coopNames: readonly string[] = [];
+  /** Names and colours of a multi-player run (co-op or ?bots); null when solo. */
+  party: Party | null = null;
   private ranked: RankedRun | null = null;
   private net: NetRun | null = null;
   private bots: { readonly count: number; readonly brain: BotBrain } | null = null;
@@ -160,13 +161,18 @@ export class Game {
     const fresh = start.frames.length === 0;
     this.ranked = null;
     this.localPlayer = me;
-    this.coopNames = start.roster.map((r) => r.name);
+    this.party = {
+      names: start.roster.map((r) => r.name),
+      colors: start.roster.map((r) => SEAT_COLORS[r.seat % SEAT_COLORS.length]!),
+      me,
+    };
     this.world = startWorld(start);
     this.net = { queue: [], applied: 0, intermissionSince: null };
     // A rejoin or resync catches up silently on the frames already played.
     for (const frame of start.frames) this.playFrame(frame, false);
     this.view.focus = me;
     this.view.setWorld(this.world);
+    this.view.setParty(this.party);
     this.view.hudVisible = true;
     this.screen = 'run';
     this.paused = false;
@@ -209,7 +215,7 @@ export class Game {
 
   private endCoopRun(): void {
     this.net = null;
-    this.coopNames = [];
+    this.party = null;
     this.localPlayer = 0;
     this.view.focus = 0;
     this.world = this.backdrop();
@@ -245,6 +251,14 @@ export class Game {
       startWave: wave,
     });
     this.view.setWorld(this.world);
+    this.party = bots
+      ? {
+          names: ['You', ...Array.from({ length: bots }, (_, i) => `Bot ${i + 1}`)],
+          colors: Array.from({ length: 1 + bots }, (_, i) => SEAT_COLORS[i % SEAT_COLORS.length]!),
+          me: 0,
+        }
+      : null;
+    this.view.setParty(this.party);
     this.view.hudVisible = true;
     this.screen = 'run';
     this.paused = false;

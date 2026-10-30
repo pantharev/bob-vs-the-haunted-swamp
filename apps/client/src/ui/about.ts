@@ -14,6 +14,19 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '0.7',
+    date: '2026-10-30',
+    title: 'Co-op polish',
+    notes: [
+      'Every Bob in a party has a coloured ring, and your teammates have name tags with their HP.',
+      'Arrows at the edge of the screen point to teammates who are out of view, and blink red when they’re down.',
+      'A ring fills around a downed teammate while you revive them. When you’re the one down, a banner shows your revive and the camera follows a teammate.',
+      'The shop and level-up screens show who’s ready and how long until the next wave.',
+      'Co-op results list each player’s kills, damage, level and downs.',
+      'The bot teammates from ?bots=3 get colours and name tags too.',
+    ],
+  },
+  {
     version: '0.6',
     date: '2026-10-30',
     title: 'Co-op',

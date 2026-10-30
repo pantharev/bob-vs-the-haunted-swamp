@@ -70,7 +70,9 @@ export function damageEnemy(
   weapon: WeaponId | null = null,
 ): void {
   if (!e.alive) return;
-  world.stats.damageDealt += Math.min(amount, e.hp);
+  const dealt = Math.min(amount, e.hp);
+  world.stats.damageDealt += dealt;
+  killer.damage += dealt;
   e.hp -= amount;
   world.events.push({ type: 'enemyHit', id: e.id, x: e.x, y: e.y, amount, crit, weapon });
   if (e.action !== 'lunge') {
@@ -86,6 +88,7 @@ function killEnemy(world: World, e: Enemy, killer: Player): void {
   e.alive = false;
   e.hp = 0;
   world.stats.kills++;
+  killer.kills++;
   scoreKill(world, e);
   world.events.push({
     type: 'enemyDeath',
@@ -180,6 +183,7 @@ export function hurtPlayer(world: World, p: Player, raw: number): void {
   if (p.hp <= 0) {
     p.hp = 0;
     p.alive = false;
+    p.downs++;
     p.vx = p.vy = 0;
     world.events.push({ type: 'playerDeath', player: p.id });
   }

@@ -2,13 +2,11 @@ import { MAX_PARTY, WEAPON_IDS, WEAPONS, type WeaponId } from '@game/content';
 import { NAME_MAX, NAME_PATTERN, type Member } from '@game/coop';
 import { useEffect, useState } from 'preact/hooks';
 import { Coop } from '../coop/coop';
+import { cssColor, SEAT_COLORS } from '../coop/party';
 import type { Game } from '../game';
 import { savedName, saveName } from '../hiscores/client';
 import { useHotkeys } from './app';
 import { WEAPON_ICONS } from './format';
-
-/** One colour per lobby seat, shown on the party list (and, later, on each Bob). */
-export const SEAT_COLORS = ['#f2c14e', '#4fa9ff', '#7be36a', '#ff7a9a'] as const;
 
 /** Co-op from the title screen: create or join a game, then the room's lobby. */
 export function CoopScreen({ game }: { game: Game }) {
@@ -228,14 +226,14 @@ function PartyRow({
   if (!member) {
     return (
       <li class="empty">
-        <span class="dot" style={{ background: SEAT_COLORS[seat] }} />
+        <span class="dot" style={{ background: cssColor(SEAT_COLORS[seat]!) }} />
         <span class="who">Waiting for a friend…</span>
       </li>
     );
   }
   return (
     <li class={you ? 'you' : undefined}>
-      <span class="dot" style={{ background: SEAT_COLORS[seat] }} />
+      <span class="dot" style={{ background: cssColor(SEAT_COLORS[seat]!) }} />
       <span class="who">
         {member.name}
         {you && <small> (you)</small>}
@@ -278,16 +276,46 @@ function WeaponPicks({
   );
 }
 
-/** Between waves in co-op, once you're ready: who the party is waiting for. */
-export function WaitingScreen({ game }: { game: Game }) {
-  // The countdown ticks on its own; nothing else would re-render this screen.
+/** Co-op shop and level-up screens: where everyone is, and the shop timer. */
+export function PartyStrip({ game }: { game: Game }) {
+  useTicker();
+  const party = game.party;
+  if (!game.isCoop || !party) return null;
+  const left = game.shopSecondsLeft;
+  return (
+    <div class="party-strip">
+      {game.world.players.map((p, i) => (
+        <span key={i} class={`member ${p.intermission === 'ready' ? 'ready' : ''}`}>
+          <span class="dot" style={{ background: cssColor(party.colors[i] ?? 0xffffff) }} />
+          {i === party.me ? 'You' : (party.names[i] ?? `Player ${i + 1}`)}
+          <small>
+            {p.intermission === 'ready'
+              ? 'ready'
+              : p.intermission === 'levelUp'
+                ? 'levelling up'
+                : 'shopping'}
+          </small>
+        </span>
+      ))}
+      {left !== null && <span class="timer">next wave in {left} s at most</span>}
+    </div>
+  );
+}
+
+/** Re-renders twice a second: countdowns tick even when nothing else changes. */
+function useTicker(): void {
   const [, tick] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => tick((n) => n + 1), 500);
     return () => clearInterval(timer);
   }, []);
+}
+
+/** Between waves in co-op, once you're ready: who the party is waiting for. */
+export function WaitingScreen({ game }: { game: Game }) {
+  useTicker();
   const waitingFor = game.world.players
-    .map((p, i) => ({ p, name: game.coopNames[i] ?? `Player ${i + 1}` }))
+    .map((p, i) => ({ p, name: game.party?.names[i] ?? `Player ${i + 1}` }))
     .filter(({ p }) => p.alive && p.intermission !== 'ready')
     .map(({ name }) => name);
   const left = game.shopSecondsLeft;

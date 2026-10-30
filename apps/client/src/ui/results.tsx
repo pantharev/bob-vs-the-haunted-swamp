@@ -2,6 +2,7 @@ import { WEAPONS } from '@game/content';
 import type { Player } from '@game/sim';
 import { useState } from 'preact/hooks';
 import type { Game } from '../game';
+import { cssColor } from '../coop/party';
 import { HiscoreError, savedName, saveName } from '../hiscores/client';
 import { NAME_MAX, NAME_PATTERN } from '../hiscores/protocol';
 import { useHotkeys } from './app';
@@ -44,6 +45,7 @@ export function ResultsScreen({ game, player }: { game: Game; player: Player }) 
           {won
             ? `All ${world.waves.length} waves cleared.`
             : `Fell on wave ${world.wave} of ${world.waves.length}.`}
+          {coop && ` · ${formatTime(stats.timeTicks)}`}
         </p>
         <p class="score">
           {formatScore(stats.score)}
@@ -53,8 +55,9 @@ export function ResultsScreen({ game, player }: { game: Game; player: Player }) 
           Kills {formatScore(stats.killPoints)} · Wave bonus {formatScore(stats.waveBonus)}
           {won && ` · Victory ${formatScore(stats.victoryBonus)}`}
         </p>
-        {coop ? <p class="hint">Co-op hiscores are coming soon.</p> : <PostScore game={game} />}
-        <dl class="summary">
+        {coop ? <PartyResults game={game} /> : <PostScore game={game} />}
+        {/* Co-op shows everyone in the table above instead. */}
+        <dl class="summary" hidden={coop}>
           <dt>Kills</dt>
           <dd>{stats.kills}</dd>
           <dt>Coins</dt>
@@ -83,6 +86,44 @@ export function ResultsScreen({ game, player }: { game: Game; player: Player }) 
         </div>
       </div>
     </div>
+  );
+}
+
+/** Co-op: everyone's share of the run. */
+function PartyResults({ game }: { game: Game }) {
+  const party = game.party;
+  if (!party) return null;
+  return (
+    <table class="party-results">
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th class="num">Kills</th>
+          <th class="num">Damage</th>
+          <th class="num">Level</th>
+          <th class="num">Downs</th>
+        </tr>
+      </thead>
+      <tbody>
+        {game.world.players.map((p, i) => (
+          <tr key={i} class={i === party.me ? 'you' : undefined}>
+            <td>
+              <span class="dot" style={{ background: cssColor(party.colors[i] ?? 0xffffff) }} />{' '}
+              {party.names[i]}
+              {p.weapons.map((w, k) => (
+                <span key={k} class="weapon" title={WEAPONS[w.id].name}>
+                  {WEAPON_ICONS[w.id]}
+                </span>
+              ))}
+            </td>
+            <td class="num">{formatScore(p.kills)}</td>
+            <td class="num">{formatScore(Math.round(p.damage))}</td>
+            <td class="num">{p.level}</td>
+            <td class="num">{p.downs}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
