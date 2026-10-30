@@ -1,6 +1,12 @@
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, type JoinResult } from '@game/coop';
 import { Room, type Outbox, type Randomness } from './room';
 
+/** A browser on other rules than this server would drift out of lockstep. */
+const OUTDATED: JoinResult = {
+  ok: false,
+  error: 'The game was just updated. Reload the page (give it a minute if it says this again).',
+};
+
 /** All live rooms, by code and by socket. */
 export class Rooms {
   private readonly rooms = new Map<string, Room>();
@@ -9,6 +15,8 @@ export class Rooms {
   constructor(
     private readonly outbox: (code: string) => Outbox,
     private readonly random: Randomness & { code(): string },
+    /** This server's rules hash. */
+    private readonly rules: string,
     private readonly log: (message: string) => void = () => {},
   ) {}
 
@@ -16,7 +24,12 @@ export class Rooms {
     return this.rooms.size;
   }
 
-  create(socket: string, p: { name: unknown; weapon: unknown }, now: number): JoinResult {
+  create(
+    socket: string,
+    p: { name: unknown; weapon: unknown; rules?: unknown },
+    now: number,
+  ): JoinResult {
+    if (p.rules !== this.rules) return OUTDATED;
     this.leaveAny(socket, now);
     let code = this.random.code();
     for (let guard = 0; this.rooms.has(code) && guard < 100; guard++) code = this.random.code();
@@ -32,9 +45,10 @@ export class Rooms {
 
   join(
     socket: string,
-    p: { code: unknown; name: unknown; weapon: unknown; token?: unknown },
+    p: { code: unknown; name: unknown; weapon: unknown; rules?: unknown; token?: unknown },
     now: number,
   ): JoinResult {
+    if (p.rules !== this.rules) return OUTDATED;
     const code = typeof p.code === 'string' ? p.code.trim().toUpperCase() : '';
     const room = this.rooms.get(code);
     if (!room) return { ok: false, error: "That game doesn't exist any more. Ask for a new link." };

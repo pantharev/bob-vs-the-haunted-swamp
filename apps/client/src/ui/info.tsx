@@ -1,4 +1,4 @@
-import { ELITE, ENEMIES, MAX_WEAPONS, SCORE, ZONES } from '@game/content';
+import { ELITE, ENEMIES, MAX_PARTY, MAX_WEAPONS, REVIVE, SCORE, ZONES } from '@game/content';
 import { useState } from 'preact/hooks';
 import type { Game } from '../game';
 import { CHANGELOG, CREATOR } from './about';
@@ -122,6 +122,21 @@ export function HelpScreen({ onBack }: { onBack: () => void }) {
           about to lunge.
         </li>
         <li>Elites are huge, tough, and drop a pile of coins.</li>
+      </ul>
+
+      <h2>Co-op</h2>
+      <ul class="lines">
+        <li>
+          Press Play with friends on the title screen and send the invite link. Up to {MAX_PARTY}{' '}
+          players share one run, each with their own weapons and shop.
+        </li>
+        <li>
+          The horde grows with the party: more monsters, a little tougher, and much tougher elites.
+        </li>
+        <li>
+          At 0 HP you&apos;re down, not out: a teammate standing next to you for {REVIVE.seconds}{' '}
+          seconds gets you back up. Anyone still down when a wave ends returns for the next one.
+        </li>
       </ul>
 
       <h2>Score and hiscores</h2>

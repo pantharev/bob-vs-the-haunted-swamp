@@ -267,28 +267,49 @@ describe('lockstep', () => {
 });
 
 describe('rooms', () => {
-  it('makes codes from the unambiguous alphabet and finds rooms case-insensitively', () => {
+  it('makes codes from the unambiguous alphabet, finds rooms case-insensitively, and checks rules', () => {
     let i = 0;
     const code = roomCode(() => i++ % 7);
     expect(code).toMatch(/^[A-HJ-KM-NP-Z2-9]{6}$/);
-    const rooms = new Rooms(() => ({ all() {}, one() {} }), {
-      seed: () => 1,
-      token: () => 't',
-      code: () => 'QWERTY',
-    });
-    expect(rooms.create('a', { name: 'Ann', weapon: 'staff' }, 0).ok).toBe(true);
-    expect(rooms.join('b', { code: ' qwerty ', name: 'Bo', weapon: 'staff' }, 0).ok).toBe(true);
-    expect(rooms.join('c', { code: 'NOPE22', name: 'Cy', weapon: 'staff' }, 0).ok).toBe(false);
+    const rooms = new Rooms(
+      () => ({ all() {}, one() {} }),
+      {
+        seed: () => 1,
+        token: () => 't',
+        code: () => 'QWERTY',
+      },
+      'v1',
+    );
+    expect(rooms.create('a', { name: 'Ann', weapon: 'staff', rules: 'v1' }, 0).ok).toBe(true);
+    expect(
+      rooms.join('b', { code: ' qwerty ', name: 'Bo', weapon: 'staff', rules: 'v1' }, 0).ok,
+    ).toBe(true);
+    expect(
+      rooms.join('c', { code: 'NOPE22', name: 'Cy', weapon: 'staff', rules: 'v1' }, 0).ok,
+    ).toBe(false);
+    // A browser on other rules would drift: it gets told to reload instead.
+    const outdated = rooms.join(
+      'd',
+      { code: 'QWERTY', name: 'Di', weapon: 'staff', rules: 'v0' },
+      0,
+    );
+    expect(outdated.ok).toBe(false);
+    if (!outdated.ok) expect(outdated.error).toMatch(/updated/);
+    expect(rooms.create('e', { name: 'Ed', weapon: 'staff', rules: 'v0' }, 0).ok).toBe(false);
     expect(rooms.of('b')?.code).toBe('QWERTY');
   });
 
   it('closes rooms that stay empty', () => {
-    const rooms = new Rooms(() => ({ all() {}, one() {} }), {
-      seed: () => 1,
-      token: () => 't',
-      code: () => 'QWERTY',
-    });
-    rooms.create('a', { name: 'Ann', weapon: 'staff' }, 0);
+    const rooms = new Rooms(
+      () => ({ all() {}, one() {} }),
+      {
+        seed: () => 1,
+        token: () => 't',
+        code: () => 'QWERTY',
+      },
+      'v1',
+    );
+    rooms.create('a', { name: 'Ann', weapon: 'staff', rules: 'v1' }, 0);
     rooms.leaveAny('a', 0);
     rooms.tick(60_000);
     expect(rooms.size).toBe(1);

@@ -71,10 +71,11 @@ export type JoinResult =
   | { readonly ok: false; readonly error: string };
 
 export interface ClientToServer {
-  create(p: { name: string; weapon: WeaponId }, ack: (r: JoinResult) => void): void;
+  /** `rules` is the build's rules hash: the server only seats browsers running the same rules. */
+  create(p: { name: string; weapon: WeaponId; rules: string }, ack: (r: JoinResult) => void): void;
   /** `token` rejoins the seat it was issued for (reloads, dropped connections). */
   join(
-    p: { code: string; name: string; weapon: WeaponId; token?: string },
+    p: { code: string; name: string; weapon: WeaponId; rules: string; token?: string },
     ack: (r: JoinResult) => void,
   ): void;
   /** Lobby changes to your own seat. */

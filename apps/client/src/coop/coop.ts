@@ -65,12 +65,14 @@ export class Coop {
   }
 
   create(name: string, weapon: WeaponId): Promise<void> {
-    return this.enter((s, ack) => s.emit('create', { name, weapon }, ack));
+    return this.enter((s, ack) => s.emit('create', { name, weapon, rules: __RULES__ }, ack));
   }
 
   join(code: string, name: string, weapon: WeaponId): Promise<void> {
     const token = readToken(code) ?? undefined;
-    return this.enter((s, ack) => s.emit('join', { code, name, weapon, token }, ack));
+    return this.enter((s, ack) =>
+      s.emit('join', { code, name, weapon, token, rules: __RULES__ }, ack),
+    );
   }
 
   update(p: { name?: string; weapon?: WeaponId; ready?: boolean }): void {
@@ -184,12 +186,16 @@ export class Coop {
       const me = this.me;
       const token = lobby ? readToken(lobby.code) : null;
       if (!lobby || !me || !token) return;
-      socket.emit('join', { code: lobby.code, name: me.name, weapon: me.weapon, token }, (r) => {
-        this.reconnecting = false;
-        if (r.ok) this.lobby = r.lobby;
-        else this.error = r.error;
-        this.notify();
-      });
+      socket.emit(
+        'join',
+        { code: lobby.code, name: me.name, weapon: me.weapon, token, rules: __RULES__ },
+        (r) => {
+          this.reconnecting = false;
+          if (r.ok) this.lobby = r.lobby;
+          else this.error = r.error;
+          this.notify();
+        },
+      );
     });
   }
 

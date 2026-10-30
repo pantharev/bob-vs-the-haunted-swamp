@@ -14,6 +14,17 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '0.6',
+    date: '2026-10-30',
+    title: 'Co-op',
+    notes: [
+      'Co-op is live! Press Play with friends on the title screen, send the invite link, and take on the swamp with up to 3 friends.',
+      'Everyone picks a weapon and readies up, then the host starts. Between waves everyone levels up and shops on their own; the next wave starts once everyone is ready, or after 45 seconds.',
+      'Esc opens the menu in co-op, but the game keeps going. If your connection drops or you reload, you go straight back into your game.',
+      'Co-op makes sure everyone runs the same version of the game. If you don’t, it asks you to reload instead of letting the game drift apart.',
+    ],
+  },
+  {
     version: '0.5',
     date: '2026-10-29',
     title: 'Co-op groundwork',

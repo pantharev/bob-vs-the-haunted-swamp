@@ -4,7 +4,8 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
-const SOURCES = ['packages/sim/src', 'packages/content/src'];
+// Co-op's lockstep step is part of the rules too: browser and server must agree on it.
+const SOURCES = ['packages/sim/src', 'packages/content/src', 'packages/coop/src'];
 
 /**
  * A short hash of the sim and content sources. A replay only re-runs the same

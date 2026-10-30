@@ -33,13 +33,19 @@ function allowed(origin: string | undefined): boolean {
   );
 }
 
+/** The rules hash, baked in by the production build; computed from the sources under `tsx` in dev. */
+const RULES =
+  typeof __RULES__ === 'string'
+    ? __RULES__
+    : (await import('../../client/scripts/rules-version')).rulesVersion();
+
 const log = (message: string) => console.log(`${new Date().toISOString()} ${message}`);
 const now = () => performance.now();
 
 const http = createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'content-type': 'text/plain' });
-    res.end(`ok ${rooms.size} rooms`);
+    res.end(`ok ${rooms.size} rooms, rules ${RULES}`);
     return;
   }
   res.writeHead(404);
@@ -64,6 +70,7 @@ const rooms = new Rooms(
     token: () => randomBytes(16).toString('hex'),
     code: () => roomCode((n) => randomInt(0, n)),
   },
+  RULES,
   log,
 );
 
@@ -117,7 +124,10 @@ io.on('connection', (socket: Socket<ClientToServer, ServerToClient>) => {
 setInterval(() => rooms.tick(now()), TICK_MS);
 
 http.listen(PORT, () =>
-  log(`co-op server on :${PORT}${ALLOWED.length ? `, allowing ${ALLOWED.join(', ')}` : ''}`),
+  log(
+    `co-op server on :${PORT}, rules ${RULES}, ` +
+      (ALLOWED.length ? `allowing ${ALLOWED.join(', ')}` : 'no ALLOWED_ORIGINS set'),
+  ),
 );
 
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
