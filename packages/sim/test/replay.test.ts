@@ -19,15 +19,17 @@ function recordBot(seed: number, weapon: WeaponId) {
   let killPoints = 0;
   let waveBonus = 0;
   const run = recordBotRun(seed, zone, weapon, (world) => {
-    for (const e of world.events) {
+    world.events.forEach((e, i) => {
       if (e.type === 'enemyDeath' && !e.cleared) {
         killPoints += ENEMIES[e.enemy].points * (e.elite ? ELITE.points : 1);
       }
       if (e.type === 'waveEnd') {
         const p = world.players[0]!;
-        waveBonus += Math.round((SCORE.waveBonus * e.wave * p.hp) / p.maxHp);
+        // The bonus is scored first; the harvest after it can level Bob up (+1 max HP and HP each).
+        const late = world.events.slice(i).filter((x) => x.type === 'levelUp').length;
+        waveBonus += Math.round((SCORE.waveBonus * e.wave * (p.hp - late)) / (p.maxHp - late));
       }
-    }
+    });
   });
   return { ...run, killPoints, waveBonus };
 }

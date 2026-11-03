@@ -3,14 +3,17 @@
  * with the party: arrays are indexed by party size − 1. Tuned with bot parties
  * until 2–4 bots win about as often, and lose about as much HP, as a solo bot
  * (2026-10-29, 100 seeds: wins 37% solo, 38% / 29% / 30% for 2 / 3 / 4 players,
- * 23–25% HP lost per wave for all). Re-check: BALANCE=100 npx vitest run party.balance --silent=false
+ * 23–25% HP lost per wave for all). Metal tiers helped parties far more than
+ * solo players (wins 50% / 68% for 2 / 4), so enemy HP was raised again
+ * (2026-11-01, 50 seeds: 38% / 32% / 28%; solo unchanged at 37%).
+ * Re-check: BALANCE=100 npx vitest run party.balance --silent=false
  */
 export const MAX_PARTY = 4;
 
 export const COOP_SCALING = {
   /** Spawn rules fire this many times as often. */
   spawnRate: [1, 1.6, 2.2, 2.8],
-  enemyHp: [1, 1.05, 1.1, 1.15],
+  enemyHp: [1, 1.15, 1.38, 1.6],
   /** Everyone shoots the same elite, so its HP scales harder. */
   eliteHp: [1, 1.6, 2.2, 2.8],
   /** Alive-enemy cap: higher for bigger parties, bounded for phones. */

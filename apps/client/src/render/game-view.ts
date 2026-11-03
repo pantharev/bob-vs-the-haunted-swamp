@@ -1,4 +1,4 @@
-import { WEAPONS, type EnemyId, type WeaponId } from '@game/content';
+import { TIERS, WEAPONS, type EnemyId, type Tier, type WeaponId } from '@game/content';
 import type { Player, SimEvent, World } from '@game/sim';
 import { Container, Sprite, type Application, type Texture } from 'pixi.js';
 import type { Party } from '../coop/party';
@@ -27,6 +27,18 @@ const SLASH_TINT: Partial<Record<WeaponId, number>> = { scimitar: 0xdfe8f0, dagg
 const EXPLOSION_TINT: Partial<Record<WeaponId, number>> = { staff: 0x7fd0ff, boomchin: 0xffa040 };
 /** Peak height of a lobbed throw (wu). */
 const LOB_HEIGHT = 70;
+
+/** Bronze keeps each weapon's own colour; higher tiers lean towards their metal's. */
+function tierTint(base: number, tier: Tier, amount = 0.65): number {
+  if (tier === 1) return base;
+  const metal = TIERS[tier].color;
+  const mix = (shift: number) => {
+    const a = (base >> shift) & 0xff;
+    const b = (metal >> shift) & 0xff;
+    return Math.round(a + (b - a) * amount) << shift;
+  };
+  return mix(16) | mix(8) | mix(0);
+}
 
 /**
  * Draws the sim. Reads world state only, never writes it, so the same
@@ -173,13 +185,18 @@ export class GameView {
               ev.dirY,
               def.range,
               ev.weapon === 'dagger',
-              SLASH_TINT[ev.weapon] ?? 0xffffff,
+              tierTint(SLASH_TINT[ev.weapon] ?? 0xffffff, ev.tier),
             );
           }
           break;
         }
         case 'explosion':
-          this.fx.explosion(ev.x, ev.y, ev.radius, EXPLOSION_TINT[ev.weapon] ?? 0xffffff);
+          this.fx.explosion(
+            ev.x,
+            ev.y,
+            ev.radius,
+            tierTint(EXPLOSION_TINT[ev.weapon] ?? 0xffffff, ev.tier, 0.4),
+          );
           if (ev.weapon === 'boomchin') this.camera.shake(0.12);
           break;
         case 'pickup': {
@@ -358,12 +375,15 @@ export class GameView {
         s.rotation = t * 9;
         s.scale.set(1.1);
         s.blendMode = 'normal';
+        // A lobbed critter is a critter, whatever its tier.
+        s.tint = 0xffffff;
       } else {
         s.position.set(x, y - CHEST_HEIGHT);
         s.rotation = Math.atan2(pr.vy, pr.vx);
         const glow = pr.weapon === 'staff';
         s.scale.set(glow ? 0.75 : 1.1);
         s.blendMode = glow ? 'add' : 'normal';
+        s.tint = tierTint(0xffffff, pr.tier);
       }
     });
   }

@@ -15,7 +15,7 @@ export {
 } from './replay';
 export { enemyCap, reviveProgress, spawnRate } from './party';
 export { createWorld, type WorldOptions } from './run';
-export { buyBlocker, rerollPrice, sellPrice, SHOP_SLOTS } from './shop';
+export { buyBlocker, mergePartner, rerollPrice, sellPrice, SHOP_SLOTS, weaponPrice } from './shop';
 export { pickupRange, xpToNext } from './stats';
 export { step } from './step';
 export type {

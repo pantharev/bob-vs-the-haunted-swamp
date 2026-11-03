@@ -1,4 +1,4 @@
-import type { EnemyId, WeaponId } from '@game/content';
+import type { EnemyId, Tier, WeaponId } from '@game/content';
 
 export type PickupKind = 'coin' | 'food';
 export type RunOutcome = 'victory' | 'defeat';
@@ -42,6 +42,7 @@ export type SimEvent =
       readonly type: 'attack';
       readonly player: number;
       readonly weapon: WeaponId;
+      readonly tier: Tier;
       readonly x: number;
       readonly y: number;
       readonly dirX: number;
@@ -50,6 +51,7 @@ export type SimEvent =
   | {
       readonly type: 'explosion';
       readonly weapon: WeaponId;
+      readonly tier: Tier;
       readonly x: number;
       readonly y: number;
       readonly radius: number;

@@ -1,4 +1,11 @@
-import { WEAPONS, type ArcWeapon, type LobWeapon, type ProjectileWeapon } from '@game/content';
+import {
+  TIERS,
+  WEAPONS,
+  type ArcWeapon,
+  type LobWeapon,
+  type ProjectileWeapon,
+  type Tier,
+} from '@game/content';
 import { DT, MAX_ENEMY_RADIUS, TICK_RATE, seconds } from './constants';
 import { explode, weaponHit } from './combat';
 import { nearestEnemy } from './enemies';
@@ -35,16 +42,26 @@ export function updateWeapons(world: World): void {
         dy = 0;
       }
 
-      if (def.pattern === 'arc') swing(world, p, def, dx, dy);
-      else if (def.pattern === 'projectile') shoot(world, p, def, dx, dy);
-      else lob(world, p, def, target);
-      world.events.push({ type: 'attack', player: p.id, weapon: def.id, x: p.x, y: p.y, dirX: dx, dirY: dy });
-      w.cooldown = Math.max(1, Math.round((def.cooldown * TICK_RATE) / attackSpeedMultiplier(p)));
+      if (def.pattern === 'arc') swing(world, p, def, w.tier, dx, dy);
+      else if (def.pattern === 'projectile') shoot(world, p, def, w.tier, dx, dy);
+      else lob(world, p, def, w.tier, target);
+      world.events.push({
+        type: 'attack',
+        player: p.id,
+        weapon: def.id,
+        tier: w.tier,
+        x: p.x,
+        y: p.y,
+        dirX: dx,
+        dirY: dy,
+      });
+      const rate = attackSpeedMultiplier(p) * TIERS[w.tier].attackSpeed;
+      w.cooldown = Math.max(1, Math.round((def.cooldown * TICK_RATE) / rate));
     }
   }
 }
 
-function swing(world: World, p: Player, def: ArcWeapon, dx: number, dy: number): void {
+function swing(world: World, p: Player, def: ArcWeapon, tier: Tier, dx: number, dy: number): void {
   const near = world.grid.query(p.x, p.y, def.range + MAX_ENEMY_RADIUS, arcNear);
   for (const index of near) {
     const e = world.enemies[index];
@@ -57,12 +74,19 @@ function swing(world: World, p: Player, def: ArcWeapon, dx: number, dy: number):
     const d = Math.sqrt(d2);
     // Anything touching Bob is hit whatever the angle.
     const inCone = d <= e.radius + p.radius || ex * dx + ey * dy >= def.arcCos * d;
-    if (inCone) weaponHit(world, p, def, e, d > 0.001 ? ex / d : dx, d > 0.001 ? ey / d : dy);
+    if (inCone) weaponHit(world, p, def, tier, e, d > 0.001 ? ex / d : dx, d > 0.001 ? ey / d : dy);
   }
 }
 
-function shoot(world: World, p: Player, def: ProjectileWeapon, dx: number, dy: number): void {
-  const pr = acquire(world, p, def.id);
+function shoot(
+  world: World,
+  p: Player,
+  def: ProjectileWeapon,
+  tier: Tier,
+  dx: number,
+  dy: number,
+): void {
+  const pr = acquire(world, p, def.id, tier);
   pr.x = pr.prevX = p.x + dx * p.radius;
   pr.y = pr.prevY = p.y + dy * p.radius;
   pr.vx = dx * def.speed;
@@ -72,8 +96,8 @@ function shoot(world: World, p: Player, def: ProjectileWeapon, dx: number, dy: n
   pr.pierce = def.pierce;
 }
 
-function lob(world: World, p: Player, def: LobWeapon, target: Enemy): void {
-  const pr = acquire(world, p, def.id);
+function lob(world: World, p: Player, def: LobWeapon, tier: Tier, target: Enemy): void {
+  const pr = acquire(world, p, def.id, tier);
   const flight = Math.max(1, seconds(def.flightTime));
   pr.lob = true;
   pr.x = pr.prevX = pr.startX = p.x;
@@ -106,7 +130,8 @@ export function updateProjectiles(world: World): void {
       pr.y = pr.startY + (pr.targetY - pr.startY) * t;
       if (pr.age >= pr.flight) {
         pr.alive = false;
-        if (def.pattern === 'lob') explode(world, owner, def, pr.x, pr.y, def.splash * aoeMultiplier(owner));
+        if (def.pattern === 'lob')
+          explode(world, owner, def, pr.tier, pr.x, pr.y, def.splash * aoeMultiplier(owner));
       }
       continue;
     }
@@ -135,8 +160,9 @@ export function updateProjectiles(world: World): void {
       if (dx * dx + dy * dy > reach * reach) continue;
 
       pr.hits.push(e.id);
-      if (def.splash > 0) explode(world, owner, def, pr.x, pr.y, def.splash * aoeMultiplier(owner));
-      else weaponHit(world, owner, def, e, pr.vx / def.speed, pr.vy / def.speed);
+      if (def.splash > 0)
+        explode(world, owner, def, pr.tier, pr.x, pr.y, def.splash * aoeMultiplier(owner));
+      else weaponHit(world, owner, def, pr.tier, e, pr.vx / def.speed, pr.vy / def.speed);
       if (--pr.pierce < 0) {
         pr.alive = false;
         break;
@@ -145,12 +171,13 @@ export function updateProjectiles(world: World): void {
   }
 }
 
-function acquire(world: World, p: Player, weapon: Projectile['weapon']): Projectile {
+function acquire(world: World, p: Player, weapon: Projectile['weapon'], tier: Tier): Projectile {
   const pr = world.pools.projectiles.pop() ?? blankProjectile();
   pr.id = world.nextId++;
   pr.alive = true;
   pr.owner = p.id;
   pr.weapon = weapon;
+  pr.tier = tier;
   pr.vx = pr.vy = 0;
   pr.radius = 0;
   pr.life = 0;
@@ -170,6 +197,7 @@ function blankProjectile(): Projectile {
     alive: false,
     owner: 0,
     weapon: 'shortbow',
+    tier: 1,
     x: 0,
     y: 0,
     prevX: 0,

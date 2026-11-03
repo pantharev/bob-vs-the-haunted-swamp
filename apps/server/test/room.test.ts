@@ -225,6 +225,29 @@ describe('lockstep', () => {
       expect(worldHash(t.client(s).world!)).toBe(worldHash(t.room.world!));
   });
 
+  it('merges weapons in co-op, the same on every client', () => {
+    const t = startWith('a', 'b');
+    t.run(20_500);
+    expect(t.room.world!.phase).toBe('intermission');
+    // Give player a two Iron daggers everywhere, as if bought earlier.
+    for (const world of [t.room.world!, t.client('a').world!, t.client('b').world!]) {
+      world.players[0]!.weapons.push(
+        { id: 'dagger', tier: 2, cooldown: 0 },
+        { id: 'dagger', tier: 2, cooldown: 0 },
+      );
+    }
+    const p = t.room.world!.players[0]!;
+    while (p.intermission === 'levelUp') {
+      t.room.action('a', { type: 'chooseUpgrade', index: 0 });
+      t.run(50);
+    }
+    t.room.action('a', { type: 'merge', index: 1 });
+    t.run(100);
+    expect(p.weapons.map((w) => `${w.id}${w.tier}`)).toEqual(['dagger1', 'dagger3']);
+    for (const s of ['a', 'b'])
+      expect(worldHash(t.client(s).world!)).toBe(worldHash(t.room.world!));
+  });
+
   it('readies players still shopping when the shop timer runs out', () => {
     const t = startWith('a', 'b');
     t.run(20_500);

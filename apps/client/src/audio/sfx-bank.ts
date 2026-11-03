@@ -786,6 +786,25 @@ export const SFX = {
       bell(s, note('A5'), 0.12, 0.3, 0.6);
     },
   }),
+  merge: sfx({
+    seconds: 1.2,
+    level: -18,
+    variants: 1,
+    voices: 1,
+    gap: 0.1,
+    jitter: 0,
+    render: (s) => {
+      // Two hammer blows on an anvil, then the new metal rings out.
+      for (const at of [0, 0.16]) {
+        s.metal({ freq: 520, at, decay: 0.16, gain: 0.9, cutoff: 6000 });
+        s.noise({ at, decay: 0.03, gain: 0.6, filter: { type: 'bandpass', freq: 3200, q: 3 } });
+      }
+      arp(s, ['D5', 'A5', 'D6', 'F6'], 0.05, 0.32);
+      bell(s, note('A6'), 0.5, 0.6, 0.5);
+      sparkle(s, 6, 0.35, 0.8, 0.08);
+      s.reverb(0.3, 0.6);
+    },
+  }),
   reroll: sfx({
     seconds: 0.45,
     level: -22,
@@ -933,6 +952,7 @@ export type UiSound = Extract<
   | 'start'
   | 'buy'
   | 'sell'
+  | 'merge'
   | 'reroll'
   | 'lock'
   | 'unlock'

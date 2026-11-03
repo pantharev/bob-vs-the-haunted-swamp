@@ -10,6 +10,7 @@ export {
   PARTY_BOARD_NAMES,
   PARTY_SIZES,
   PLAYER_ID_PATTERN,
+  SEASON,
   type BoardId,
   type BoardPlacing,
   type PartySize,

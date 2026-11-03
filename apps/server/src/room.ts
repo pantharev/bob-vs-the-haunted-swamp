@@ -409,6 +409,7 @@ const ACTIONS: ReadonlySet<string> = new Set([
   'reroll',
   'toggleLock',
   'sellWeapon',
+  'merge',
   'ready',
 ]);
 

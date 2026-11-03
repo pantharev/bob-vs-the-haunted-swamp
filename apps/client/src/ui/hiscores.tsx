@@ -6,6 +6,7 @@ import {
   isTeamSize,
   PARTY_BOARD_NAMES,
   PARTY_SIZES,
+  SEASON,
   type BoardId,
   type BoardResponse,
   type HiscoreEntry,
@@ -86,6 +87,7 @@ export function HiscoresScreen({ game, onBack }: { game: Game; onBack: () => voi
           : 'The co-op server plays every party run, so each one goes on the board by itself. A team (the same players) keeps its best run.'}{' '}
         The weekly board resets on Mondays (UTC).
       </p>
+      <p class="hint">Season {SEASON} began on 2 November 2026 with metal weapon tiers.</p>
     </InfoPage>
   );
 }

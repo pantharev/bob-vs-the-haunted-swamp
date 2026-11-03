@@ -24,6 +24,7 @@ const ACTION_TYPES: ReadonlySet<string> = new Set([
   'reroll',
   'toggleLock',
   'sellWeapon',
+  'merge',
   'ready',
 ] satisfies RunAction['type'][]);
 

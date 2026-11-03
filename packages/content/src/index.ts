@@ -13,6 +13,7 @@ export * from './enemies';
 export * from './items';
 export * from './score';
 export * from './skills';
+export * from './tiers';
 export * from './waves';
 export * from './weapons';
 

@@ -1,7 +1,8 @@
-import { type SkillId, type WeaponId, type ZoneDef } from '@game/content';
+import { MAX_WEAPONS, type SkillId, type WeaponId, type ZoneDef } from '@game/content';
 import {
   applyAction,
   buyBlocker,
+  mergePartner,
   createWorld,
   ReplayRecorder,
   step,
@@ -135,11 +136,16 @@ export function botIntermission(
         const b = p.upgrades[best]!;
         const better =
           u.rarity > b.rarity ||
-          (u.rarity === b.rarity && SKILL_PRIORITY.indexOf(u.skill) < SKILL_PRIORITY.indexOf(b.skill));
+          (u.rarity === b.rarity &&
+            SKILL_PRIORITY.indexOf(u.skill) < SKILL_PRIORITY.indexOf(b.skill));
         if (better) best = i;
       });
       act({ type: 'chooseUpgrade', index: best });
     } else if (p.intermission === 'shop') {
+      // Near-full slots: merge a pair to make room for what the shop has.
+      const pair = p.weapons.findIndex((w, i) => mergePartner(p, w.id, w.tier, i) >= 0);
+      if (pair >= 0 && p.weapons.length >= MAX_WEAPONS - 1 && act({ type: 'merge', index: pair }))
+        continue;
       const buyable = p.shop
         .map((offer, i) => ({ offer, i }))
         .filter(({ offer }) => buyBlocker(p, offer) === null)
@@ -154,7 +160,10 @@ export function botIntermission(
 }
 
 function score(offer: Player['shop'][number], p: Player): number {
-  if (offer.kind === 'weapon') return p.weapons.length < 4 ? 10 : 1;
+  if (offer.kind === 'weapon') {
+    const twin = mergePartner(p, offer.id, offer.tier) >= 0;
+    return (p.weapons.length < 4 ? 10 : 0) + offer.tier * 1.5 + (twin ? 2 : 0);
+  }
   return offer.rarity * 2;
 }
 
@@ -184,7 +193,10 @@ export function runBot(
       botIntermission(world, 0);
       continue;
     }
-    step(world, world.players.map((p) => botInput(world, p)));
+    step(
+      world,
+      world.players.map((p) => botInput(world, p)),
+    );
     maxEnemies = Math.max(maxEnemies, world.enemies.length);
     onTick?.(world);
   }

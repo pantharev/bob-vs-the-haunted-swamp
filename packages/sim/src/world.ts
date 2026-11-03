@@ -6,6 +6,7 @@ import {
   type Rarity,
   type SkillId,
   type StatKey,
+  type Tier,
   type WaveDef,
   type WeaponId,
   type ZoneDef,
@@ -20,6 +21,8 @@ export type Intermission = 'levelUp' | 'shop' | 'ready';
 
 export interface OwnedWeapon {
   readonly id: WeaponId;
+  /** Metal tier, 1 (Bronze) to 7. */
+  tier: Tier;
   /** Ticks until it can fire again. */
   cooldown: number;
 }
@@ -35,6 +38,8 @@ export interface ShopOffer {
   /** A WeaponId or an item id. */
   readonly id: string;
   readonly rarity: Rarity;
+  /** A weapon's metal tier; 1 for items. */
+  readonly tier: Tier;
   readonly price: number;
   locked: boolean;
   sold: boolean;
@@ -135,6 +140,8 @@ export interface Projectile {
   alive: boolean;
   owner: number;
   weapon: WeaponId;
+  /** The firing weapon's tier, which sets the damage on impact. */
+  tier: Tier;
   x: number;
   y: number;
   prevX: number;
@@ -278,7 +285,7 @@ export function createPlayer(
     skills,
     skillTotals: { ...skills },
     items: {},
-    weapons: weapons.map((weapon) => ({ id: weapon, cooldown: 0 })),
+    weapons: weapons.map((weapon) => ({ id: weapon, tier: 1, cooldown: 0 })),
     stats: {} as Record<StatKey, number>,
     intermission: 'ready',
     upgrades: [],
@@ -290,11 +297,7 @@ export function createPlayer(
   };
 }
 
-export function createWorldState(
-  seed: number,
-  zone: ZoneDef,
-  players: Player[],
-): World {
+export function createWorldState(seed: number, zone: ZoneDef, players: Player[]): World {
   const arena: Arena = { width: zone.width, height: zone.height };
   return {
     seed,

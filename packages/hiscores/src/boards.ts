@@ -5,8 +5,11 @@ import type { Placing } from './store';
  * board for solo runs, and the same pair for each co-op party size.
  */
 
-/** Bump to start fresh boards, e.g. after a big balance change. */
-export const SEASON = 1;
+/**
+ * Bump to start fresh boards, e.g. after a big balance change. Season 2 began
+ * with metal tiers (2026-11-02); earlier boards stay in Redis under `bob:s1:`.
+ */
+export const SEASON = 2;
 /** Every key the hiscores use starts with this. */
 export const KEY_PREFIX = `bob:s${SEASON}`;
 /** Weekly boards outlive their week by a while, then expire. */

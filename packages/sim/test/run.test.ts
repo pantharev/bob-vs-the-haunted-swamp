@@ -1,10 +1,35 @@
-import { MAX_WEAPONS, ZONES, type WaveDef, type ZoneDef } from '@game/content';
+import {
+  MAX_TIER,
+  MAX_WEAPONS,
+  shopTier,
+  TIERS,
+  WEAPONS,
+  ZONES,
+  type WaveDef,
+  type ZoneDef,
+} from '@game/content';
 import { describe, expect, it } from 'vitest';
-import { applyAction, createWorld, NEUTRAL_INPUT, step, TICK_RATE, type World } from '../src';
+import {
+  applyAction,
+  createWorld,
+  NEUTRAL_INPUT,
+  sellPrice,
+  step,
+  TICK_RATE,
+  weaponPrice,
+  type World,
+} from '../src';
 import { damageEnemy, gainXp, spawnEnemy } from '../src/combat';
+import { restock } from '../src/shop';
+import { updateWeapons } from '../src/weapons';
 import { armourFactor, xpToNext } from '../src/stats';
 
-const quietWave = (duration: number): WaveDef => ({ duration, hpScale: 1, damageScale: 1, spawns: [] });
+const quietWave = (duration: number): WaveDef => ({
+  duration,
+  hpScale: 1,
+  damageScale: 1,
+  spawns: [],
+});
 const quietZone = (...durations: number[]): ZoneDef => ({
   ...ZONES.wolfmoor,
   waves: durations.map(quietWave),
@@ -164,8 +189,8 @@ describe('shop', () => {
   it('refuses weapons once every slot is full, and always keeps one weapon', () => {
     const world = shopWorld();
     const p = playerOf(world);
-    while (p.weapons.length < MAX_WEAPONS) p.weapons.push({ id: 'dagger', cooldown: 0 });
-    p.shop[0] = { kind: 'weapon', id: 'shortbow', rarity: 1, price: 10, locked: false, sold: false };
+    while (p.weapons.length < MAX_WEAPONS) p.weapons.push({ id: 'dagger', tier: 1, cooldown: 0 });
+    p.shop[0] = weaponOffer('shortbow', 1);
     expect(applyAction(world, 0, { type: 'buy', index: 0 })).toBe(false);
 
     while (p.weapons.length > 1) applyAction(world, 0, { type: 'sellWeapon', index: 0 });
@@ -173,13 +198,130 @@ describe('shop', () => {
     expect(p.weapons).toHaveLength(1);
   });
 
+  it('merges a bought weapon into its twin when every slot is full', () => {
+    const world = shopWorld();
+    const p = playerOf(world);
+    while (p.weapons.length < MAX_WEAPONS) p.weapons.push({ id: 'dagger', tier: 1, cooldown: 0 });
+    p.shop[0] = weaponOffer('dagger', 1);
+    p.shop[1] = weaponOffer('dagger', 2);
+    expect(applyAction(world, 0, { type: 'buy', index: 0 })).toBe(true);
+    expect(p.weapons).toHaveLength(MAX_WEAPONS);
+    expect(p.weapons.map((w) => w.tier)).toEqual([1, 2, 1, 1, 1, 1]);
+    // An Iron dagger now has a twin to merge with, too.
+    expect(applyAction(world, 0, { type: 'buy', index: 1 })).toBe(true);
+    expect(p.weapons.map((w) => w.tier)).toEqual([1, 3, 1, 1, 1, 1]);
+  });
+
   it('applies item stats when bought', () => {
     const world = shopWorld();
     const p = playerOf(world);
     const before = p.maxHp;
-    p.shop[0] = { kind: 'item', id: 'thickCloak', rarity: 1, price: 10, locked: false, sold: false };
+    p.shop[0] = {
+      kind: 'item',
+      id: 'thickCloak',
+      rarity: 1,
+      tier: 1,
+      price: 10,
+      locked: false,
+      sold: false,
+    };
     applyAction(world, 0, { type: 'buy', index: 0 });
     expect(p.skillTotals.hitpoints).toBe(3);
     expect(p.maxHp).toBe(before + 9);
   });
 });
+
+describe('metal tiers', () => {
+  function shopWorld(seed = 9): World {
+    const world = createWorld({ seed, zone: quietZone(1, 1) });
+    idle(world, TICK_RATE);
+    playerOf(world).coins = 1000;
+    return world;
+  }
+
+  it('merges two of a weapon at one tier into the next, in the earlier slot', () => {
+    const world = shopWorld();
+    const p = playerOf(world);
+    p.weapons.push(
+      { id: 'dagger', tier: 2, cooldown: 0 },
+      { id: 'shortbow', tier: 2, cooldown: 0 },
+      { id: 'dagger', tier: 2, cooldown: 0 },
+      { id: 'dagger', tier: 1, cooldown: 0 },
+    );
+    expect(applyAction(world, 0, { type: 'merge', index: 3 })).toBe(true);
+    expect(p.weapons.map((w) => `${w.id}${w.tier}`)).toEqual([
+      'scimitar1',
+      'dagger3',
+      'shortbow2',
+      'dagger1',
+    ]);
+    // No twin: the shortbow, the last dagger, the scimitar.
+    for (const index of [0, 2, 3])
+      expect(applyAction(world, 0, { type: 'merge', index })).toBe(false);
+  });
+
+  it('stops merging at the top tier', () => {
+    const world = shopWorld();
+    const p = playerOf(world);
+    p.weapons.push({ id: 'dagger', tier: MAX_TIER, cooldown: 0 });
+    p.weapons.push({ id: 'dagger', tier: MAX_TIER, cooldown: 0 });
+    expect(applyAction(world, 0, { type: 'merge', index: 1 })).toBe(false);
+  });
+
+  it('prices and sells by tier', () => {
+    const world = shopWorld();
+    expect(weaponPrice('dagger', 1, 1)).toBe(WEAPONS.dagger.price);
+    expect(weaponPrice('dagger', 4, 1)).toBe(Math.round(WEAPONS.dagger.price * TIERS[4].price));
+    expect(sellPrice(world, 'dagger', 4)).toBe(Math.floor(weaponPrice('dagger', 4, 1) / 2));
+  });
+
+  it("stocks weapons around the wave's tier, never above Runic", () => {
+    const world = shopWorld();
+    const p = playerOf(world);
+    const seen = new Map<number, number>();
+    for (const wave of [1, 5, 9]) {
+      world.wave = wave;
+      seen.clear();
+      for (let i = 0; i < 400; i++) {
+        restock(world, p);
+        for (const o of p.shop)
+          if (o.kind === 'weapon') seen.set(o.tier, (seen.get(o.tier) ?? 0) + 1);
+      }
+      const base = shopTier(wave);
+      const tiers = [...seen.keys()];
+      expect(Math.min(...tiers)).toBeGreaterThanOrEqual(Math.max(1, base - 1));
+      expect(Math.max(...tiers)).toBeLessThanOrEqual(Math.min(6, base + 2));
+      // Most offers sit on the wave's own tier.
+      const total = [...seen.values()].reduce((a, b) => a + b, 0);
+      expect(seen.get(base)! / total).toBeGreaterThan(0.55);
+    }
+  });
+
+  it('hits harder and faster as the tier rises', () => {
+    const hit = (tier: 1 | 4) => {
+      const world = createWorld({ seed: 3, zone: quietZone(60) });
+      const p = playerOf(world);
+      p.weapons[0]!.tier = tier;
+      const e = spawnEnemy(world, 'zombie', p.x + 30, p.y, false);
+      e.hp = e.maxHp = 1e6;
+      world.grid.rebuild(world.enemies);
+      world.events.length = 0;
+      updateWeapons(world);
+      const ev = world.events.find((x) => x.type === 'enemyHit');
+      if (ev?.type !== 'enemyHit') throw new Error('no hit');
+      return {
+        damage: ev.amount / (ev.crit ? WEAPONS.scimitar.critMultiplier : 1),
+        cooldown: p.weapons[0]!.cooldown,
+      };
+    };
+    const bronze = hit(1);
+    const mithril = hit(4);
+    expect(bronze.damage).toBeCloseTo(WEAPONS.scimitar.damage, 0);
+    expect(mithril.damage).toBeCloseTo(WEAPONS.scimitar.damage * TIERS[4].damage, 0);
+    expect(mithril.cooldown).toBe(Math.round(bronze.cooldown / TIERS[4].attackSpeed));
+  });
+});
+
+function weaponOffer(id: 'dagger' | 'shortbow', tier: 1 | 2) {
+  return { kind: 'weapon', id, rarity: 1, tier, price: 10, locked: false, sold: false } as const;
+}

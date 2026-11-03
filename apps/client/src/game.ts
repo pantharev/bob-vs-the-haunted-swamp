@@ -504,6 +504,8 @@ export class Game {
         return p?.shop[action.index]?.locked ? 'unlock' : 'lock';
       case 'sellWeapon':
         return 'sell';
+      case 'merge':
+        return 'merge';
       case 'ready':
         // The wave's own horn follows straight away.
         return 'click';

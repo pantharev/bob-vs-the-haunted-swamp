@@ -2,10 +2,13 @@ import {
   ITEMS_BY_ID,
   SKILLS,
   STATS,
+  tieredName,
+  TIERS,
   WEAPONS,
   type ItemMods,
   type SkillId,
   type StatKey,
+  type Tier,
   type WeaponId,
 } from '@game/content';
 import type { ShopOffer } from '@game/sim';
@@ -85,10 +88,21 @@ export function modLines(mods: ItemMods): string[] {
   return lines;
 }
 
-export function weaponStats(id: WeaponId): string[] {
+/** A metal tier's colour, for CSS. */
+export function tierCss(tier: Tier): string {
+  return `#${TIERS[tier].color.toString(16).padStart(6, '0')}`;
+}
+
+/** "Mithril scimitar". */
+export function weaponName(id: WeaponId, tier: Tier): string {
+  return tieredName(tier, WEAPONS[id].name);
+}
+
+export function weaponStats(id: WeaponId, tier: Tier = 1): string[] {
   const w = WEAPONS[id];
+  const t = TIERS[tier];
   const lines = [
-    `${w.damage} damage · ${number(1 / w.cooldown)} hits/s`,
+    `${number(w.damage * t.damage)} damage · ${number(t.attackSpeed / w.cooldown)} hits/s`,
     `Range ${w.range} · ${w.class}`,
   ];
   if (w.critChance >= 0.2) lines.push(`${Math.round(w.critChance * 100)}% crit chance`);
@@ -96,11 +110,20 @@ export function weaponStats(id: WeaponId): string[] {
   return lines;
 }
 
-export function offerInfo(o: ShopOffer): { icon: string; name: string; blurb: string; lines: string[] } {
+export function offerInfo(o: ShopOffer): {
+  icon: string;
+  name: string;
+  blurb: string;
+  lines: string[];
+} {
   if (o.kind === 'weapon') {
     const id = o.id as WeaponId;
-    const w = WEAPONS[id];
-    return { icon: WEAPON_ICONS[id], name: w.name, blurb: w.blurb, lines: weaponStats(id) };
+    return {
+      icon: WEAPON_ICONS[id],
+      name: weaponName(id, o.tier),
+      blurb: WEAPONS[id].blurb,
+      lines: weaponStats(id, o.tier),
+    };
   }
   const item = ITEMS_BY_ID.get(o.id);
   return {

@@ -1,8 +1,18 @@
-import { ELITE, ENEMIES, MAX_PARTY, MAX_WEAPONS, REVIVE, SCORE, ZONES } from '@game/content';
+import {
+  ELITE,
+  ENEMIES,
+  MAX_PARTY,
+  MAX_TIER,
+  MAX_WEAPONS,
+  REVIVE,
+  SCORE,
+  TIERS,
+  ZONES,
+} from '@game/content';
 import { useState } from 'preact/hooks';
 import type { Game } from '../game';
 import { CHANGELOG, CREATOR } from './about';
-import { formatScore } from './format';
+import { formatScore, tierCss } from './format';
 import { HiscoresScreen } from './hiscores';
 import { InfoPage } from './info-page';
 
@@ -107,6 +117,22 @@ export function HelpScreen({ onBack }: { onBack: () => void }) {
         <li>
           Lock an offer to keep it for the next shop, reroll for new offers, or sell a weapon you've
           outgrown.
+        </li>
+        <li>
+          Weapons come in {MAX_TIER} metals:{' '}
+          {Object.values(TIERS).map((t, i) => (
+            <span key={t.tier} style={{ color: tierCss(t.tier) }}>
+              {i > 0 && ' → '}
+              {t.name}
+            </span>
+          ))}
+          . Each one hits harder and a little faster. The shop sells better metals as the waves go
+          on.
+        </li>
+        <li>
+          Two of the same weapon in the same metal merge into the next one: press Merge in your
+          weapon slots. With all {MAX_WEAPONS} slots full, buying a twin merges it straight away.{' '}
+          {TIERS[MAX_TIER].name} is never for sale.
         </li>
       </ul>
 

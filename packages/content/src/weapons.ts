@@ -1,6 +1,6 @@
 /**
- * Weapons auto-fire at the nearest enemy in range (PLAN.md §2). Phase 1 ships
- * five bronze-tier weapons; tiers and merging arrive in Phase 4.
+ * Weapons auto-fire at the nearest enemy in range (PLAN.md §2). These are the
+ * Bronze stats; each weapon comes in seven metal tiers (tiers.ts, PLAN.md §13).
  *
  * Times are in seconds, distances in wu, speeds in wu/s. Knockback is an
  * impulse in wu/s that the target's mass divides.

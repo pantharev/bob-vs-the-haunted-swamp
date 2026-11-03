@@ -1,5 +1,5 @@
 import { startWave } from './run';
-import { buy, openShop, rerollPrice, restock, sellPrice } from './shop';
+import { buy, mergeWeapons, openShop, rerollPrice, restock, sellPrice } from './shop';
 import { recomputeStats } from './stats';
 import { rollUpgrades } from './upgrades';
 import type { World } from './world';
@@ -14,6 +14,8 @@ export type RunAction =
   | { readonly type: 'reroll' }
   | { readonly type: 'toggleLock'; readonly index: number }
   | { readonly type: 'sellWeapon'; readonly index: number }
+  /** Merges a weapon with its twin (same weapon, same tier) into the next tier. */
+  | { readonly type: 'merge'; readonly index: number }
   | { readonly type: 'ready' };
 
 /** Applies one player's action. Returns false (and changes nothing) if it isn't allowed now. */
@@ -60,14 +62,17 @@ export function applyAction(world: World, playerIndex: number, action: RunAction
       const weapon = p.weapons[action.index];
       // Always keep one weapon, or the run can't progress.
       if (p.intermission !== 'shop' || !weapon || p.weapons.length <= 1) return false;
-      p.coins += sellPrice(world, weapon.id);
+      p.coins += sellPrice(world, weapon.id, weapon.tier);
       p.weapons.splice(action.index, 1);
       return true;
     }
+    case 'merge':
+      return p.intermission === 'shop' && mergeWeapons(p, action.index);
     case 'ready': {
       if (p.intermission !== 'shop') return false;
       p.intermission = 'ready';
-      if (world.players.every((q) => !q.alive || q.intermission === 'ready')) startWave(world, world.wave + 1);
+      if (world.players.every((q) => !q.alive || q.intermission === 'ready'))
+        startWave(world, world.wave + 1);
       return true;
     }
   }

@@ -5,14 +5,16 @@ import {
   SKILL_IDS,
   SKILLS,
   STATS,
-  WEAPONS,
   type StatKey,
+  type Tier,
+  type WeaponId,
 } from '@game/content';
-import { buyBlocker, rerollPrice, sellPrice, type Player } from '@game/sim';
+import { buyBlocker, mergePartner, rerollPrice, sellPrice, type Player } from '@game/sim';
 import type { Game } from '../game';
 import { useHotkeys } from './app';
 import { PartyStrip } from './coop';
-import { formatStat, itemIcon, offerInfo, WEAPON_ICONS } from './format';
+import { formatStat, itemIcon, offerInfo, tierCss, weaponName } from './format';
+import { Loadout, WeaponIcon } from './weapon-icon';
 
 const BLOCKER_TEXT = { sold: 'Sold', coins: 'Not enough gp', slots: 'Weapon slots full' } as const;
 
@@ -49,17 +51,30 @@ export function ShopScreen({ game, player }: { game: Game; player: Player }) {
             {player.coins} <small>gp</small>
           </span>
         </header>
+        <Loadout weapons={player.weapons} slots={MAX_WEAPONS} class="shop-loadout" />
 
         <div class="cards">
           {player.shop.map((offer, i) => {
             const info = offerInfo(offer);
             const blocker = buyBlocker(player, offer);
+            const weapon = offer.kind === 'weapon' ? (offer.id as WeaponId) : null;
+            // With every slot taken, a bought weapon merges into its twin.
+            const merges =
+              weapon !== null &&
+              !offer.sold &&
+              player.weapons.length >= MAX_WEAPONS &&
+              mergePartner(player, weapon, offer.tier) >= 0;
             return (
               <div
                 key={`${offer.id}-${i}`}
                 class={`card offer rarity-${offer.rarity} ${offer.sold ? 'sold' : ''}`}
+                style={weapon ? { '--rarity': tierCss(offer.tier) } : undefined}
               >
-                <span class="icon">{info.icon}</span>
+                {weapon ? (
+                  <WeaponIcon id={weapon} tier={offer.tier} class="icon" />
+                ) : (
+                  <span class="icon">{info.icon}</span>
+                )}
                 <span class="name">{info.name}</span>
                 <span class="rarity">
                   {offer.kind === 'weapon' ? 'Weapon' : RARITY_NAMES[offer.rarity]}
@@ -93,6 +108,11 @@ export function ShopScreen({ game, player }: { game: Game; player: Player }) {
                   </button>
                 </div>
                 {blocker === 'slots' && !offer.sold && <span class="warn">Weapon slots full</span>}
+                {merges && (
+                  <span class="merge-note">
+                    Merges into {weaponName(weapon, (offer.tier + 1) as Tier)}
+                  </span>
+                )}
               </div>
             );
           })}
@@ -113,16 +133,27 @@ export function ShopScreen({ game, player }: { game: Game; player: Player }) {
           </h2>
           <div class="slots">
             {player.weapons.map((w, i) => (
-              <div key={i} class="slot">
-                <span class="icon">{WEAPON_ICONS[w.id]}</span>
-                <span class="name">{WEAPONS[w.id].name}</span>
-                <button
-                  class="small"
-                  disabled={player.weapons.length <= 1}
-                  onClick={() => game.act({ type: 'sellWeapon', index: i })}
-                >
-                  Sell +{sellPrice(world, w.id)}
-                </button>
+              <div key={i} class="slot" style={{ '--tier': tierCss(w.tier) }}>
+                <WeaponIcon id={w.id} tier={w.tier} class="icon" />
+                <span class="name">{weaponName(w.id, w.tier)}</span>
+                <span class="slot-actions">
+                  {mergePartner(player, w.id, w.tier, i) >= 0 && (
+                    <button
+                      class="small merge"
+                      title={`Merge with your other ${weaponName(w.id, w.tier)} into ${weaponName(w.id, (w.tier + 1) as Tier)}`}
+                      onClick={() => game.act({ type: 'merge', index: i })}
+                    >
+                      Merge
+                    </button>
+                  )}
+                  <button
+                    class="small"
+                    disabled={player.weapons.length <= 1}
+                    onClick={() => game.act({ type: 'sellWeapon', index: i })}
+                  >
+                    Sell +{sellPrice(world, w.id, w.tier)}
+                  </button>
+                </span>
               </div>
             ))}
             {Array.from({ length: MAX_WEAPONS - player.weapons.length }, (_, i) => (

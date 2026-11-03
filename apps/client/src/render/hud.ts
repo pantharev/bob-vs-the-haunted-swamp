@@ -1,9 +1,13 @@
+import { TIERS } from '@game/content';
 import { xpToNext, type Player, type World } from '@game/sim';
-import { BitmapText, Container, Sprite, Texture } from 'pixi.js';
+import { BitmapText, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
+import { WEAPON_ICONS } from '../ui/format';
 import { HUD_FONT, type Art } from './art';
 
 const BAR_WIDTH = 180;
 const MARGIN = 12;
+/** Diameter of a weapon's ring in the loadout row. */
+const RING = 24;
 
 /**
  * In-run HUD drawn in Pixi (PLAN.md §5: menus are DOM, the HUD stays on the
@@ -22,6 +26,8 @@ export class Hud {
   private readonly scoreText = text(13);
   private readonly waveText = text(14);
   private readonly timerText = text(30);
+  private readonly loadout = new Container();
+  private loadoutKey = '';
   private readonly safe = SafeArea.shared();
   private shown = new Map<BitmapText, string>();
 
@@ -56,8 +62,18 @@ export class Hud {
     this.bankText.tint = 0xffd75a;
     this.scoreText.position.set(0, 62);
 
-    this.left.addChild(hpFrame, hpBack, this.hpFill, this.hpText, xpBack, this.xpFill, this.levelText);
+    this.left.addChild(
+      hpFrame,
+      hpBack,
+      this.hpFill,
+      this.hpText,
+      xpBack,
+      this.xpFill,
+      this.levelText,
+    );
     this.left.addChild(coin, this.coinText, this.bankText, this.scoreText);
+    this.loadout.position.set(0, 82);
+    this.left.addChild(this.loadout);
 
     this.waveText.anchor.set(0.5, 0);
     this.timerText.anchor.set(0.5, 0);
@@ -85,11 +101,35 @@ export class Hud {
     this.bankText.x = this.coinText.x + this.coinText.width + 8;
     this.set(this.bankText, p.bank > 0 ? `+${p.bank} banked` : '');
     this.set(this.scoreText, `SCORE ${world.stats.score.toLocaleString('en-US')}`);
+    this.drawLoadout(p);
 
     const left = Math.max(0, Math.ceil((world.waveTicks - world.waveTick) / 60));
     this.set(this.waveText, `WAVE ${world.wave} / ${world.waves.length}`);
     this.set(this.timerText, String(left));
     this.timerText.tint = left <= 5 ? 0xff6a4a : 0xffffff;
+  }
+
+  /** The weapons, each icon in a ring of its metal's colour. Redrawn only when they change. */
+  private drawLoadout(p: Player): void {
+    const key = p.weapons.map((w) => `${w.id}:${w.tier}`).join(',');
+    if (key === this.loadoutKey) return;
+    this.loadoutKey = key;
+    for (const old of this.loadout.removeChildren()) old.destroy({ children: true });
+    p.weapons.forEach((w, i) => {
+      const color = TIERS[w.tier].color;
+      const ring = new Graphics()
+        .circle(0, 0, RING / 2)
+        .fill({ color: 0x000000, alpha: 0.6 })
+        .circle(0, 0, RING / 2 - 1)
+        .fill({ color, alpha: 0.18 })
+        .stroke({ color, width: 2 });
+      const icon = new Text({ text: WEAPON_ICONS[w.id], style: { fontSize: 13 } });
+      icon.anchor.set(0.5);
+      const slot = new Container();
+      slot.position.set(RING / 2 + i * (RING + 4), RING / 2);
+      slot.addChild(ring, icon);
+      this.loadout.addChild(slot);
+    });
   }
 
   private set(target: BitmapText, value: string): void {

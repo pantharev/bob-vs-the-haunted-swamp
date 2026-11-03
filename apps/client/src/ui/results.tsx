@@ -1,4 +1,3 @@
-import { WEAPONS } from '@game/content';
 import type { Player } from '@game/sim';
 import { useState } from 'preact/hooks';
 import type { Game } from '../game';
@@ -6,8 +5,9 @@ import { cssColor } from '../coop/party';
 import { HiscoreError, savedName, saveName } from '../hiscores/client';
 import { isTeamSize, NAME_MAX, NAME_PATTERN, PARTY_BOARD_NAMES } from '../hiscores/protocol';
 import { useHotkeys } from './app';
-import { formatScore, formatTime, WEAPON_ICONS } from './format';
+import { formatScore, formatTime } from './format';
 import { InfoScreen, useInfoPage } from './info';
+import { Loadout, WeaponIcon } from './weapon-icon';
 
 export function ResultsScreen({ game, player }: { game: Game; player: Player }) {
   const { world } = game;
@@ -75,15 +75,8 @@ export function ResultsScreen({ game, player }: { game: Game; player: Player }) 
           <dd>{stats.damageDealt}</dd>
           <dt>Time</dt>
           <dd>{formatTime(stats.timeTicks)}</dd>
-          <dt>Weapons</dt>
-          <dd>
-            {player.weapons.map((w, i) => (
-              <span key={i} title={WEAPONS[w.id].name}>
-                {WEAPON_ICONS[w.id]}
-              </span>
-            ))}
-          </dd>
         </dl>
+        {!coop && <Loadout weapons={player.weapons} />}
         <div class="actions">
           <button class="primary big" onClick={again}>
             {coop ? 'Back to lobby' : 'Play again'}
@@ -118,9 +111,7 @@ function PartyResults({ game }: { game: Game }) {
               <span class="dot" style={{ background: cssColor(party.colors[i] ?? 0xffffff) }} />{' '}
               {party.names[i]}
               {p.weapons.map((w, k) => (
-                <span key={k} class="weapon" title={WEAPONS[w.id].name}>
-                  {WEAPON_ICONS[w.id]}
-                </span>
+                <WeaponIcon key={k} id={w.id} tier={w.tier} class="weapon" />
               ))}
             </td>
             <td class="num">{formatScore(p.kills)}</td>

@@ -1,6 +1,6 @@
 # Survivors-like: Bob vs. the Haunted Swamp — Game Plan
 
-> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a passed in Chromium, Firefox, WebKit and on an Android phone; 5b (party scaling and revives) is built; 5c (server and lobby) and 5d (co-op feel) are live on Railway since 2026-10-30, and 5e (co-op hiscores) is built. Working title is TBD.
+> **Status:** Phase 0 done (2026-10-27). Phase 1 done and play-tested (2026-10-28). Phase 2 started with the Tone.js music and the full SFX bank (2026-10-28); the Strudel comparison is next. Hiscores (Phase 3's first half) are built on Vercel + Upstash (§8, 2026-10-28). Co-op (§9, Phase 5) is agreed (2026-10-29); 5a passed in Chromium, Firefox, WebKit and on an Android phone; 5b (party scaling and revives) is built; 5c (server and lobby), 5d (co-op feel) and 5e (co-op hiscores) are live since 2026-10-30. The Arsenal (Phase 4A, §13: weapon tiers, chests, relics, greatswords) is agreed and A1 (metal tiers) is built. Working title is TBD.
 > **Decided 2026-10-27:** inspired-by naming (no RuneScape names in the game) · PixiJS + own sim · art via GPT Image.
 > Library versions below were checked on npm today. Art is generated with GPT Image through the user's ChatGPT subscription (§6).
 
@@ -68,7 +68,7 @@ There are 6 slots. Weapons auto-fire at the nearest enemy.
 | Frost burst staff | Magic | AoE freeze around Bob (Ancient Magicks nod) |
 | Cannon | Crafting | Deployable turret that rotates and fires |
 
-**Tiers:** Bronze → Iron → Steel → Mithril → Adamant → Rune → Dragon. Two copies of the same weapon at the same tier merge into the next tier. A tier is just a **colour tint** on one icon, so we need one piece of art per weapon, not seven.
+**Tiers:** Bronze → Iron → Steel → Mithril → Adamant → Runic → Wyrmsteel (inspired names for the classic ladder, §13). Two copies of the same weapon at the same tier merge into the next tier. A tier is just a **colour tint** on one icon, so we need one piece of art per weapon, not seven.
 
 ### Items (passives that make enemy mechanics matter)
 - Salve amulet (+% vs undead)
@@ -339,7 +339,7 @@ Two rules keep a horde from turning into noise:
 Skins unlock from achievements:
 - **Werebob** (1,000 werewolves)
 - **Ghostly Bob** (die 25 times)
-- **Rune Bob** (clear difficulty 5)
+- **Runic Bob** (clear difficulty 5)
 - **Party-hat Bob**: secret, a 1/5,000 drop on any kill
 
 ---
@@ -366,9 +366,9 @@ Each player brings their own weapons, so the horde has to grow. Tuned with bot p
 | Players | Spawn rate | Enemy HP | Elite HP | Enemy cap |
 |---|---|---|---|---|
 | 1 | ×1 | ×1 | ×1 | 300 |
-| 2 | ×1.6 | ×1.05 | ×1.6 | 340 |
-| 3 | ×2.2 | ×1.1 | ×2.2 | 380 |
-| 4 | ×2.8 | ×1.15 | ×2.8 | 420 |
+| 2 | ×1.6 | ×1.05 (×1.15 since metal tiers) | ×1.6 | 340 |
+| 3 | ×2.2 | ×1.1 (×1.38 since metal tiers) | ×2.2 | 380 |
+| 4 | ×2.8 | ×1.15 (×1.6 since metal tiers) | ×2.8 | 420 |
 
 - **Result:** bots win 37% solo, and 38% / 29% / 30% in parties of 2 / 3 / 4, losing 23–25% of their HP per wave in every size. The first guess (enemy HP up to ×1.45, elites ×3.4) was too hard: each player earned 30–45% fewer coins than solo, so builds fell behind.
 - Damage per hit doesn't change: each player faces the same danger per contact, just more of it at once.
@@ -454,10 +454,24 @@ This replaces the earlier snapshot plan. That plan rejected lockstep because cro
 
 ### Phase 4: Content depth (large)
 - 20 waves, the full bestiary, the Alpha Werewolf and Abyssal Overlord bosses.
-- Weapon tiers and merging, about 30 items, damage tags (silver/undead/demon), bones → prayer special.
+- Weapon tiers and merging (now Phase 4A, §13), about 30 items, damage tags (silver/undead/demon), bones → prayer special.
 - Zone 2 (The Myre), difficulty 0–5, Ironman mode, more achievements and skins.
 - Headless **bot-run balancing**: run thousands of simulated waves overnight and export the stats.
 - **Done when:** a full 20-wave run is balanced across difficulties, with 2 zones.
+
+### Phase 4A: The Arsenal (large; pulled ahead of Phase 4, plan in §13)
+Each step ships on its own, with a changelog entry and a bot balance sweep.
+- **A1 Metal tiers and merging (medium), v0.9.** Seven tiers, tiered shop offers, Merge in the shop, tier colours everywhere, and Season 2 boards (if decision 3 is yes).
+  - **2026-11-01: built.** `content/src/tiers.ts` holds the seven tiers and the shop's tier roll. Owned weapons, shop offers and projectiles carry a `tier`; damage and cooldown read it. The new `merge` action works in solo, replays and co-op (the server accepts it).
+  - In the shop, offers and slots take their metal's colour, and slots with a twin get Merge. Buying a twin with full slots merges it ("Merges into Adamant shortbow"). Slashes, arrows and bolts lean towards the metal's colour. Merging has its own anvil sound.
+  - **Balance (bot sweeps):** prices rise much slower than power (×4 at Wyrmsteel against ×10.7 power); with "fair" prices, bots could afford 1.8 weapons and won 12%. Solo stays at 37%. Tiers helped parties far more (duo 50%, squad 68%), so party enemy HP went from ×1.05 / ×1.1 / ×1.15 to ×1.15 / ×1.38 / ×1.6, back to 38% / 32% / 28%.
+  - Hiscores moved to Season 2 (`bob:s2:` keys); the Season 1 boards stay in Redis.
+  - The sync fixture was regenerated; Chromium, Firefox and WebKit still match Node exactly. A replay test that read HP after the wave-end harvest was fixed (a level-up there adds 1 HP after the bonus is scored).
+- **A2 Chests (medium), v0.10.** Wooden, iron-bound and gilded chests, the edge arrow, the chest screen and its rewards (coins, items, weapons, tier-ups), last-wave chests as score, and co-op auto-claim.
+- **A3 Cairn relics (medium), v0.11.** Six relics with their effects; weakened and slowed enemies.
+- **A4 Godforged greatswords (medium), v0.12.** Four greatswords, the special bar and the four specials.
+- **A5 Art pass (optional).** Real icons for tiers, chests, relics and greatswords with GPT Image.
+- **Done when:** a bot can reach Wyrmsteel and find relics and greatswords in a 10-wave run, win rates are where we want them, and co-op stays in lockstep across browsers.
 
 ### Phase 5: Co-op multiplayer (large; pulled ahead of Phase 4, plan in §9)
 - **5a Determinism check (small).** Play one recorded run in Chrome, Firefox, Safari on iOS and Chrome on Android, and compare world hashes every second. Identical everywhere means go with lockstep; otherwise switch to the snapshot fallback before building more.
@@ -534,3 +548,120 @@ This replaces the earlier snapshot plan. That plan rejected lockstep because cro
 | **Co-op desyncs** (lockstep needs every browser to compute identically) | The sim already avoids engine-dependent float math, and solo replays already match Node exactly. 5a proves it across browsers first; the desync guard rebuilds a client from the input log; snapshots are the fallback |
 | **Co-op input delay** on slow connections | Measured in 5c playtests; rollback (5f) if it hurts |
 | **Low-end Android performance** | Atlas + ParticleContainer + spatial hash + entity caps + auto quality scaling |
+
+---
+
+## 13. The Arsenal: metal tiers, chests, relics and godforged greatswords (agreed 2026-10-30)
+
+**Decided (2026-10-30):** the inspired names below; chests open at wave end; Season 2 boards start with tiers; a Merge button plus automatic merging when slots are full.
+**Confirmed (2026-11-01):** inspired names only, the metal ladder included.
+
+Pulled ahead of the rest of Phase 4, like co-op was. Today every weapon is bronze: five weapons with fixed stats, bought in the shop. This adds the metal ladder from §2, chests to find, and two families of rare named weapons.
+
+### Names (decision 1)
+§12 says in-game names are inspired, never RuneScape's own:
+
+| You asked for | In game | Why |
+|---|---|---|
+| Bronze, iron, steel | **Bronze, Iron, Steel** | Plain metals |
+| Mithril | **Mithril** | Tolkien's metal; every fantasy game uses it |
+| Adamant | **Adamant** | Old myth (adamantine); used everywhere |
+| Rune | **Runic** | "Rune" as a metal is RuneScape's; "Runic" reads the same |
+| Dragon | **Wyrmsteel** | "Dragon" gear is RuneScape's; a wyrm is a dragon |
+| Barrows | **Cairn relics**: the arms of six wights buried in the Wolfmoor cairns | The Barrows brothers are RuneScape's; barrow-wights are older folklore |
+| Godswords | **Godforged greatswords**: Dawn, War, Storm and Ruin | "Godsword" and its gods are RuneScape's |
+
+The colours follow the same ladder: brown, grey, silver, blue-purple, green, cyan, red.
+
+### 1. Metal tiers and merging
+- **Seven tiers.** Every standard weapon (scimitar, dagger, shortbow, staff, boomchin) exists in all seven. A tier is a colour and a multiplier, not new art: tinted card, tinted icon frame, tinted slashes and projectiles.
+
+| Tier | Damage | Attack speed | Price | Colour |
+|---|---|---|---|---|
+| Bronze | ×1 | ×1 | ×1 | brown |
+| Iron | ×1.45 | ×1.05 | ×1.35 | grey |
+| Steel | ×2.1 | ×1.1 | ×1.75 | silver |
+| Mithril | ×3 | ×1.15 | ×2.2 | blue-purple |
+| Adamant | ×4.2 | ×1.2 | ×2.7 | green |
+| Runic | ×5.9 | ×1.25 | ×3.3 | cyan |
+| Wyrmsteel | ×8.2 | ×1.3 | ×4 | red |
+
+  Each step is worth about ×1.5 (damage times attack speed), so a merge trades a little total power for a free slot. Prices rise slower than power: with prices rising as fast as power (the first try), the bot could only afford 1.8 weapons and won 12% of runs instead of 37%. With these prices, solo bots win 37% over 100 seeds, the same as before tiers, and the best runs reach Runic or Wyrmsteel (bot sweeps, 2026-10-31).
+- **Merging:** two of the same weapon at the same tier make one of the next tier. The weapon slots in the shop get a **Merge** button on each pair. Buying a copy when your 6 slots are full merges it on the spot, so a full bar is never a dead end. (Decision 4.)
+- **The shop rolls a tier** for each weapon offer, centred on the wave: Bronze in waves 1–2, Iron 3–4, Steel 5–6, Mithril 7–8, Adamant 9. Sometimes it's one tier lower (merge fodder) or higher (more often with Thieving luck). The shop never sells Wyrmsteel: that's for merging two Runic weapons, or a gilded chest.
+- Selling pays half the tiered price. Your starting weapon is Bronze.
+
+### 2. Chests
+- **Where they come from:**
+  - **Wooden chests** appear in the arena from wave 2, about once a wave (once per player in co-op), somewhere away from you. An arrow at the screen edge points to one that's off screen. Each lasts 20 s, then crumbles. Walking over it picks it up. The point is risk: it's usually across the horde.
+  - **Iron-bound chests** drop from every elite.
+  - **Gilded chests** are rare: about 8% of arena chests from wave 4, more with luck.
+- **Opening (decision 2):** chests you pick up are opened when the wave ends, before the level-up picks. A chest screen spins through rewards and lands on one. Mid-wave you just see "+1 chest" in the HUD, so nothing pauses. That also works in co-op, where nothing can pause.
+- **Rewards**, one per chest, rolled by the sim (so replays and co-op stay exact). Luck shifts the odds towards the rare end:
+
+| Reward | Wooden | Iron-bound | Gilded |
+|---|---|---|---|
+| Coin pouch (grows with the wave) | 45% | 20% | — |
+| Free shop item (rarer from better chests) | 25% | 30% | 25% |
+| A weapon (1–3 tiers above the shop's) | 25% | 30% | 30% |
+| Tier-up: pick one of your weapons to raise a tier | 5% | 15% | 20% |
+| A Cairn relic | — | 5% | 17% |
+| A godforged greatsword (from wave 4) | — | — | 8% |
+
+- A weapon reward with full slots offers: merge it (if you own its twin), swap it for one of yours, or sell it on the spot.
+- **Chests found in the last wave** can't be opened, so they become score: 100 / 250 / 500 points.
+- **Co-op:** a chest belongs to whoever picks it up. If a player hasn't chosen when the 45 s shop timer runs out, the server picks the first option for them, as it does for level-ups today.
+
+### 3. Cairn relics (the Barrows idea)
+Six unique weapons, one per wight. They come only from iron-bound and gilded chests. They don't tier or merge; they hit about as hard as Adamant and have an effect no metal weapon has. One of each per player.
+
+| Relic | Plays like | Effect |
+|---|---|---|
+| Cairnlord's greataxe | Slow, wide melee cleave | Up to double damage as your HP drops |
+| Warden's warspear | Long piercing thrust | Hits sometimes heal you |
+| Twin grave-mauls | Melee | Every swing hits twice; the second knocks back hard |
+| Pale flail | 360° melee spin | +75% damage to elites |
+| Hexbone staff | Magic bolt that bursts | Enemies hit deal 30% less damage for 3 s |
+| Wight crossbow | Piercing bolts | Enemies hit are slowed 40% for 2 s |
+
+The sim needs two new enemy states for these: *weakened* and *slowed*.
+
+### 4. Godforged greatswords (the godsword idea)
+Four legendary greatswords, gilded chests only, from wave 4. A huge, slow melee cleave, plus a **special attack bar** that fills as you hit. When it's full, the special fires by itself with a big effect. The bar sits under your HP. One greatsword per player.
+
+| Greatsword | Special |
+|---|---|
+| Greatsword of Dawn | A radiant cleave that heals you (and teammates nearby) 30% HP |
+| Greatsword of War | A ground slam that stuns everything near you for 2 s |
+| Greatsword of Storms | One giant cleave at ×4 damage |
+| Greatsword of Ruin | Freezes every enemy in a wide circle for 3 s |
+
+### Art and sound
+- Tiers are tints of the current placeholder icons. Chests (three looks), relics and greatswords start as procedural placeholders, like the rest of the Phase 1 art. A proper icon set via GPT Image (§6) can follow as its own step.
+- New sounds: a chest appearing, pickup, the reveal spin and jingle (a bigger one for relics and greatswords), merging, and each special attack.
+
+### Changes by package
+- **Content:**
+  - `TIERS` (names, multipliers, colours);
+  - weapons get a `family` (metal, relic or godforged) and their effects;
+  - chest tables;
+  - six relics and four greatswords.
+- **Sim:**
+  - owned weapons carry a `tier`; damage and cooldown read it;
+  - merging, and tiered shop offers;
+  - arena chest spawns, chest pickups, a per-player chest queue rolled at wave end, and a `claimChest` action;
+  - the weakened and slowed enemy states; the special bar and specials.
+  - The test bot learns to merge and claim chests, for balance sweeps.
+- **Client:**
+  - tier colours in the shop, slots, HUD and attack effects;
+  - the chest screen with its reveal;
+  - chest sprites and the edge arrow (reusing the teammate arrows);
+  - the special bar and effects;
+  - new sounds, and How to play / changelog text.
+- **Co-op server:** accepts the new action, and auto-claims chests for players who run out the timer. Lockstep needs nothing else: it's all sim.
+- **Hiscores:** scores will jump with all this power. **Decision 3:** start Season 2 (fresh boards, `bob:s2:`) when tiers land, so new runs aren't compared with bronze-only runs. The old boards stay in Redis, just not shown.
+
+### Risks
+- **Balance.** Seven tiers plus chests is a lot of new power in a 10-wave run. Every step ends with a bot sweep (100 seeds, solo and parties) aiming to keep the current win rates (37% solo, 29–38% in parties) until we deliberately change them. Waves 6–10 may need tougher enemies.
+- **Phone screens.** The shop and chest screen gain buttons. Each step is checked at 390×844.
+- **Replays and co-op.** New world state changes the rules hash, so in-progress runs from before a deploy can't be posted (as with every update), and the sync fixtures are regenerated. The cross-browser sync check is re-run.

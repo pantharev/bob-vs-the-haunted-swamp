@@ -14,6 +14,20 @@ export interface Release {
 
 export const CHANGELOG: readonly Release[] = [
   {
+    version: '0.9',
+    date: '2026-11-02',
+    title: 'Metal tiers',
+    notes: [
+      'Every weapon now comes in seven metals: Bronze, Iron, Steel, Mithril, Adamant, Runic and Wyrmsteel. Each one hits harder and a little faster.',
+      'The shop sells better metals as the waves go on, and sometimes one a step above (Thieving helps).',
+      'Merge two of the same weapon in the same metal into the next one with the new Merge button. With every slot full, buying a twin merges it straight away. Wyrmsteel is never for sale: forge it.',
+      'Metals show everywhere: coloured rings on weapon icons, coloured slashes, arrows and bolts in the fight.',
+      'See your weapons at a glance: under your score in the fight, and named by metal at the top of the shop, on the pause menu and on the results.',
+      'Hiscores Season 2 starts now, so tiered runs aren’t ranked against bronze-only ones.',
+      'Parties face tougher monsters (up to 40% more HP for a squad), since teams make the most of the new metals.',
+    ],
+  },
+  {
     version: '0.8',
     date: '2026-10-30',
     title: 'Co-op hiscores',

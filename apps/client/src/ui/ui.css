@@ -365,19 +365,126 @@ button.card:hover {
   background: #1a150f;
 }
 
+.slot {
+  flex-wrap: wrap;
+}
+
 .slot .name {
-  flex: 1;
+  flex: 1 1 90px;
   min-width: 0;
   font-size: 13px;
 }
 
+/* Merge and Sell stay together, on their own line when the name needs the room. */
+.slot-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
 .slot .icon {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .slot.empty {
   border-style: dashed;
   opacity: 0.4;
+}
+
+/* A weapon's metal tier: its colour rings the icon and names the slot. */
+.weapon-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.55em;
+  height: 1.55em;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tier) 20%, transparent);
+  box-shadow: inset 0 0 0 2px var(--tier);
+  font-size: inherit;
+  line-height: 1;
+}
+
+.slot[style] {
+  border-color: color-mix(in srgb, var(--tier) 55%, var(--edge));
+}
+
+/* Every weapon at a glance (shop, pause, results): the metal over the weapon's name. */
+.loadout {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  margin: 12px auto 0;
+  padding: 0;
+  list-style: none;
+}
+
+.loadout.shop-loadout {
+  justify-content: flex-start;
+  margin: 10px 0 14px;
+}
+
+.loadout li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  width: 60px;
+  min-height: 64px;
+  padding: 5px 2px 4px;
+  border: 1px solid color-mix(in srgb, var(--tier) 55%, var(--edge));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--tier) 8%, rgba(0, 0, 0, 0.3));
+  font-size: 11px;
+  line-height: 1.25;
+  animation: tile-in 0.4s ease-out;
+}
+
+.loadout .weapon-icon {
+  margin-bottom: 3px;
+  font-size: 17px;
+}
+
+.loadout .metal {
+  color: var(--tier);
+  font-weight: bold;
+}
+
+.loadout .kind {
+  color: var(--muted);
+}
+
+.loadout li.empty {
+  border: 1px dashed var(--edge);
+  background: none;
+  opacity: 0.5;
+  animation: none;
+}
+
+@keyframes tile-in {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+.slot .name {
+  color: var(--tier);
+  font-weight: bold;
+}
+
+.slot .merge {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.merge-note {
+  color: var(--good);
+  font-size: 12px;
 }
 
 .chips {
@@ -438,6 +545,11 @@ button.card:hover {
 .summary dd {
   margin: 0;
   font-weight: bold;
+}
+
+.party-results .weapon-icon {
+  margin-left: 3px;
+  font-size: 12px;
 }
 
 /* ---------------------------------------------------------------- in-run */
@@ -527,10 +639,15 @@ button.card:hover {
   .card .icon {
     font-size: 24px;
   }
+  /* Three and three, rather than five and a straggler. */
+  .loadout {
+    max-width: calc(3 * 60px + 2 * 5px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .screen.enter {
+  .screen.enter,
+  .loadout li {
     animation: none;
   }
   button.card:hover {

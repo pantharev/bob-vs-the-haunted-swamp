@@ -1,4 +1,12 @@
-import { ELITE, ENEMIES, type EnemyId, type WeaponDef, type WeaponId } from '@game/content';
+import {
+  ELITE,
+  ENEMIES,
+  TIERS,
+  type EnemyId,
+  type Tier,
+  type WeaponDef,
+  type WeaponId,
+} from '@game/content';
 import { MAX_ENEMY_RADIUS, MAX_GOO, MAX_PICKUPS, seconds } from './constants';
 import type { PickupKind } from './events';
 import { randomUnit, type Vec } from './math';
@@ -129,12 +137,13 @@ export function weaponHit(
   world: World,
   p: Player,
   def: WeaponDef,
+  tier: Tier,
   e: Enemy,
   dirX: number,
   dirY: number,
 ): void {
   const tags = e.def.tags;
-  let amount = def.damage * classDamageMultiplier(p, def.class);
+  let amount = def.damage * TIERS[tier].damage * classDamageMultiplier(p, def.class);
   if (tags.includes('undead')) amount *= 1 + p.stats.undeadDamage / 100;
   if (tags.includes('beast')) amount *= 1 + p.stats.beastDamage / 100;
   if (e.elite || tags.includes('tough')) amount *= 1 + p.stats.slayerDamage / 100;
@@ -151,11 +160,12 @@ export function explode(
   world: World,
   p: Player,
   def: WeaponDef,
+  tier: Tier,
   x: number,
   y: number,
   radius: number,
 ): void {
-  world.events.push({ type: 'explosion', weapon: def.id, x, y, radius });
+  world.events.push({ type: 'explosion', weapon: def.id, tier, x, y, radius });
   const near = world.grid.query(x, y, radius + MAX_ENEMY_RADIUS, explosionNear);
   for (const index of near) {
     const e = world.enemies[index];
@@ -166,7 +176,7 @@ export function explode(
     const d2 = dx * dx + dy * dy;
     if (d2 > reach * reach) continue;
     const d = Math.sqrt(d2);
-    weaponHit(world, p, def, e, d > 0.001 ? dx / d : 0, d > 0.001 ? dy / d : 0);
+    weaponHit(world, p, def, tier, e, d > 0.001 ? dx / d : 0, d > 0.001 ? dy / d : 0);
   }
 }
 

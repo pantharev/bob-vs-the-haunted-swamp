@@ -1,10 +1,12 @@
 import type { Game } from '../game';
 import { InfoButtons, InfoScreen, useInfoPage } from './info';
 import { SoundToggles } from './sound-toggles';
+import { Loadout } from './weapon-icon';
 
 export function PauseScreen({ game }: { game: Game }) {
   const [page, open] = useInfoPage(game);
   if (page) return <InfoScreen game={game} page={page} onBack={() => open(null)} />;
+  const player = game.world.players[game.localPlayer];
 
   return (
     <div class="screen">
@@ -14,6 +16,7 @@ export function PauseScreen({ game }: { game: Game }) {
           Wave {game.world.wave} of {game.world.waves.length}
           {game.isCoop && ' · the game keeps going while this is open'}
         </p>
+        {player && <Loadout weapons={player.weapons} />}
         <div class="actions column">
           <button class="primary big" onClick={() => game.setPaused(false)}>
             {game.isCoop ? 'Back to the game' : 'Resume'}

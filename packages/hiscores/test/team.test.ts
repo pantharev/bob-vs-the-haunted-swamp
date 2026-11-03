@@ -18,11 +18,11 @@ function run(score: number, names: string[]): Omit<TeamSummary, 'date'> {
 }
 
 describe('boards', () => {
-  it('keeps the solo keys and gives each party size its own', () => {
-    expect(boardKey('all', 1, NOW)).toBe('bob:s1:all');
-    expect(boardKey('week', 1, NOW)).toBe('bob:s1:week:2026-W44');
-    expect(boardKey('all', 2, NOW)).toBe('bob:s1:party2:all');
-    expect(boardKey('week', 4, NOW)).toBe('bob:s1:party4:week:2026-W44');
+  it('keys solo boards by season alone and gives each party size its own', () => {
+    expect(boardKey('all', 1, NOW)).toBe('bob:s2:all');
+    expect(boardKey('week', 1, NOW)).toBe('bob:s2:week:2026-W44');
+    expect(boardKey('all', 2, NOW)).toBe('bob:s2:party2:all');
+    expect(boardKey('week', 4, NOW)).toBe('bob:s2:party4:week:2026-W44');
   });
 
   it('names ISO weeks', () => {
